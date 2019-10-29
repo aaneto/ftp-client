@@ -54,6 +54,12 @@ pub struct ServerResponse {
     status_code: StatusCode,
 }
 
+impl ServerResponse {
+    pub fn summarize(&self) -> String {
+        format!("{}: {}", self.status_code.code, self.message)
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum ServerError {
     /// IO Error
@@ -62,7 +68,8 @@ pub enum ServerError {
     #[error(msg_embedded, no_from, non_std)]
     FailureStatusCode(String),
     /// Unexpected status code
-    UnexpectedStatusCode,
+    #[error(msg_embedded, no_from, non_std)]
+    UnexpectedStatusCode(String),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -87,77 +94,28 @@ impl ServerResponse {
     }
 }
 
-struct Credentials {
-    user: String,
-    password: String,
-}
-
-pub struct ClientBuilder {
-    credentials: Option<Credentials>,
-    port: u16,
-    mode: ClientMode,
-}
-
-impl ClientBuilder {
-    pub fn new(mode: ClientMode) -> Self {
-        Self {
-            mode,
-            credentials: None,
-            port: 21,
-        }
-    }
-
-    pub fn new_passive() -> Self {
-        Self {
-            mode: ClientMode::Passive,
-            credentials: None,
-            port: 21,
-        }
-    }
-
-    pub fn with_port(mut self, port: u16) -> Self {
-        self.port = port;
-        self
-    }
-
-    pub fn with_credentials(mut self, user: &str, password: &str) -> Self {
-        self.credentials = Some(Credentials {
-            user: user.to_owned(),
-            password: password.to_owned(),
-        });
-
-        self
-    }
-
-    pub fn build(&self, hostname: &str) -> Result<Client, ServerError> {
-        let mut client = Client::new(hostname)?;
-
-        // Login happens before mode setting
-        if let Some(ref creds) = self.credentials {
-            client.login(&creds.user, &creds.password)?;
-        }
-        match self.mode {
-            ClientMode::Active => unimplemented!(),
-            ClientMode::Passive => client.passive_mode()?,
-        };
-
-        Ok(client)
-    }
-}
-
 pub struct Client {
     stream: BufReader<TcpStream>,
     /// The data stream might be on a remote server
     data_stream: Option<BufReader<TcpStream>>,
     buffer: String,
+    welcome_string: Option<String>,
+    mode: ClientMode,
+    /// Whether the current mode was set
+    mode_set: bool,
 }
 
 impl Client {
-    fn new(hostname: &str) -> Result<Self, ServerError> {
-        Self::new_with_port(hostname, 21)
+    pub fn connect(hostname: &str, user: &str, password: &str) -> Result<Self, ServerError> {
+        Self::connect_with_port(hostname, 21, user, password)
     }
 
-    fn new_with_port(hostname: &str, port: u32) -> Result<Self, ServerError> {
+    pub fn connect_with_port(
+        hostname: &str,
+        port: u32,
+        user: &str,
+        password: &str,
+    ) -> Result<Self, ServerError> {
         let host = format!("{}:{}", hostname, port);
         let raw_stream = TcpStream::connect(&host)?;
         let stream = BufReader::new(raw_stream);
@@ -167,10 +125,20 @@ impl Client {
             stream,
             buffer,
             data_stream: None,
+            welcome_string: None,
+            mode: ClientMode::Passive,
+            /// Mode will be set on first command
+            mode_set: false,
         };
-        client.read_reply_expecting(StatusCodeKind::Ok)?;
+        let response = client.read_reply_expecting(StatusCodeKind::Ok)?;
+        client.welcome_string = Some(response.message);
+        client.login(user, password)?;
 
         Ok(client)
+    }
+
+    pub fn get_welcome(&self) -> Option<&String> {
+        self.welcome_string.as_ref()
     }
 
     pub fn login(&mut self, user: &str, password: &str) -> Result<(), ServerError> {
@@ -179,6 +147,8 @@ impl Client {
 
         self.write_unary_command("PASS", password)?;
         self.read_reply_expecting(StatusCodeKind::UserLoggedIn)?;
+
+        self.set_mode()?;
 
         Ok(())
     }
@@ -244,6 +214,18 @@ impl Client {
         Ok(())
     }
 
+    fn set_mode(&mut self) -> Result<(), ServerError> {
+        if !self.mode_set {
+            self.mode_set = true;
+            match self.mode {
+                ClientMode::Passive => self.passive_mode(),
+                ClientMode::Active => unimplemented!(),
+            }
+        } else {
+            Ok(())
+        }
+    }
+
     fn read_reply_expecting(
         &mut self,
         expected_status_kind: StatusCodeKind,
@@ -253,9 +235,9 @@ impl Client {
         if response.status_code.kind == expected_status_kind {
             Ok(response)
         } else if response.is_failure_status() {
-            Err(ServerError::FailureStatusCode(response.message))
+            Err(ServerError::FailureStatusCode(response.summarize()))
         } else {
-            Err(ServerError::UnexpectedStatusCode)
+            Err(ServerError::UnexpectedStatusCode(response.summarize()))
         }
     }
 
