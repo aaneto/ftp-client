@@ -88,6 +88,11 @@ impl Client {
         Ok(())
     }
 
+    pub fn logout(&mut self) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
     pub fn cwd(&mut self, dir: &str) -> Result<(), crate::error::Error> {
         self.write_unary_command_expecting(
             "CWD",
@@ -101,6 +106,16 @@ impl Client {
     pub fn cdup(&mut self) -> Result<(), crate::error::Error> {
         self.write_command_expecting("CDUP", vec![StatusCodeKind::RequestFileActionCompleted])?;
 
+        Ok(())
+    }
+
+    pub fn help(&mut self) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn noop(&mut self) -> Result<(), crate::error::Error> {
+        unimplemented!();
         Ok(())
     }
 
@@ -165,6 +180,91 @@ impl Client {
             }
             ClientMode::Active => unimplemented!(),
         }
+    }
+
+    pub fn store<B: AsRef<[u8]>>(
+        &mut self,
+        path: &str,
+        data: B,
+    ) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn store_unique<B: AsRef<[u8]>>(
+        &mut self,
+        path: &str,
+        data: B,
+    ) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn append<B: AsRef<[u8]>>(
+        &mut self,
+        path: &str,
+        data: B,
+    ) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn restart(&mut self) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn abort(&mut self) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn allocate(
+        &mut self,
+        logical_size: usize,
+        logical_page_size: Option<usize>,
+    ) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn rename_file(
+        &mut self,
+        path_from: &str,
+        path_to: &str,
+    ) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn remove_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn make_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn pwd(&mut self) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn site_parameters(&mut self) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn system(&mut self) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
+    }
+
+    pub fn delete_file(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+        unimplemented!();
+        Ok(())
     }
 
     pub fn retrieve_file(&mut self, path: &str) -> Result<Vec<u8>, crate::error::Error> {

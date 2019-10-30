@@ -6,6 +6,8 @@ pub enum StatusCodeKind {
     TransferAboutToStart,
     /// Status code 200
     Ok,
+    /// Status code 202
+    FeatureNotImplemented,
     /// Status code 211,
     StatusCodeResponse,
     /// Status code 220
@@ -37,6 +39,7 @@ impl StatusCode {
             125 => StatusCodeKind::TransferStarted,
             150 => StatusCodeKind::TransferAboutToStart,
             200 => StatusCodeKind::Ok,
+            202 => StatusCodeKind::FeatureNotImplemented,
             211 => StatusCodeKind::StatusCodeResponse,
             220 => StatusCodeKind::ReadyForNewUser,
             226 => StatusCodeKind::RequestActionCompleted,
