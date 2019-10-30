@@ -116,7 +116,7 @@ impl Client {
     }
 
     pub fn noop(&mut self) -> Result<(), crate::error::Error> {
-        unimplemented!();
+        self.write_command_expecting("NOOP", vec![StatusCodeKind::Ok])?;
         Ok(())
     }
 
