@@ -111,7 +111,10 @@ impl Client {
     }
 
     pub fn help(&mut self) -> Result<(), crate::error::Error> {
-        unimplemented!();
+        self.write_command_expecting(
+            "HELP",
+            vec![StatusCodeKind::SystemStatus, StatusCodeKind::HelpMessage],
+        )?;
         Ok(())
     }
 
@@ -121,8 +124,7 @@ impl Client {
     }
 
     pub fn status(&mut self) -> Result<String, crate::error::Error> {
-        let response =
-            self.write_command_expecting("STAT", vec![StatusCodeKind::StatusCodeResponse])?;
+        let response = self.write_command_expecting("STAT", vec![StatusCodeKind::SystemStatus])?;
 
         Ok(response.message)
     }

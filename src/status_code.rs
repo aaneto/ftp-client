@@ -9,7 +9,9 @@ pub enum StatusCodeKind {
     /// Status code 202
     FeatureNotImplemented,
     /// Status code 211,
-    StatusCodeResponse,
+    SystemStatus,
+    /// Status code 214
+    HelpMessage,
     /// Status code 220
     ReadyForNewUser,
     /// Status code 221
@@ -27,6 +29,27 @@ pub enum StatusCodeKind {
     Unknown,
 }
 
+impl From<u16> for StatusCodeKind {
+    fn from(code: u16) -> StatusCodeKind {
+        match code {
+            125 => StatusCodeKind::TransferStarted,
+            150 => StatusCodeKind::TransferAboutToStart,
+            200 => StatusCodeKind::Ok,
+            202 => StatusCodeKind::FeatureNotImplemented,
+            211 => StatusCodeKind::SystemStatus,
+            214 => StatusCodeKind::HelpMessage,
+            221 => StatusCodeKind::ClosingControlConnection,
+            220 => StatusCodeKind::ReadyForNewUser,
+            226 => StatusCodeKind::RequestActionCompleted,
+            227 => StatusCodeKind::EnteredPassiveMode,
+            230 => StatusCodeKind::UserLoggedIn,
+            250 => StatusCodeKind::RequestFileActionCompleted,
+            331 => StatusCodeKind::PasswordRequired,
+            _ => StatusCodeKind::Unknown,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct StatusCode {
     pub kind: StatusCodeKind,
@@ -37,21 +60,7 @@ impl StatusCode {
     pub fn parse(text: &str) -> Self {
         let code: &u16 = &text[0..3].parse().unwrap();
         let code: u16 = *code;
-        let kind = match code {
-            125 => StatusCodeKind::TransferStarted,
-            150 => StatusCodeKind::TransferAboutToStart,
-            200 => StatusCodeKind::Ok,
-            202 => StatusCodeKind::FeatureNotImplemented,
-            211 => StatusCodeKind::StatusCodeResponse,
-            221 => StatusCodeKind::ClosingControlConnection,
-            220 => StatusCodeKind::ReadyForNewUser,
-            226 => StatusCodeKind::RequestActionCompleted,
-            227 => StatusCodeKind::EnteredPassiveMode,
-            230 => StatusCodeKind::UserLoggedIn,
-            250 => StatusCodeKind::RequestFileActionCompleted,
-            331 => StatusCodeKind::PasswordRequired,
-            _ => StatusCodeKind::Unknown,
-        };
+        let kind = StatusCodeKind::from(code);
 
         Self { kind, code }
     }

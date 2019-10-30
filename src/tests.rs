@@ -64,3 +64,9 @@ fn test_noop() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.noop()
 }
+
+#[test]
+fn test_help() -> Result<(), crate::error::Error> {
+    let mut client = Client::connect("test.rebex.net", "demo", "password")?;
+    client.help()
+}
