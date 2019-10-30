@@ -12,6 +12,8 @@ pub enum StatusCodeKind {
     StatusCodeResponse,
     /// Status code 220
     ReadyForNewUser,
+    /// Status code 221
+    ClosingControlConnection,
     /// Status code 226
     RequestActionCompleted,
     /// Status code 250
@@ -41,6 +43,7 @@ impl StatusCode {
             200 => StatusCodeKind::Ok,
             202 => StatusCodeKind::FeatureNotImplemented,
             211 => StatusCodeKind::StatusCodeResponse,
+            221 => StatusCodeKind::ClosingControlConnection,
             220 => StatusCodeKind::ReadyForNewUser,
             226 => StatusCodeKind::RequestActionCompleted,
             227 => StatusCodeKind::EnteredPassiveMode,

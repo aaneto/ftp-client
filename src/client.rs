@@ -89,7 +89,8 @@ impl Client {
     }
 
     pub fn logout(&mut self) -> Result<(), crate::error::Error> {
-        unimplemented!();
+        self.write_command_expecting("QUIT", vec![StatusCodeKind::ClosingControlConnection])?;
+
         Ok(())
     }
 

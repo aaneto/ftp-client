@@ -52,3 +52,9 @@ fn test_cdup() -> Result<(), crate::error::Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_logout() -> Result<(), crate::error::Error> {
+    let mut client = Client::connect("test.rebex.net", "demo", "password")?;
+    client.logout()
+}
