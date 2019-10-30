@@ -1,52 +1,7 @@
-use derive_error::Error;
+use crate::status_code::{StatusCode, StatusCodeKind};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::TcpStream;
-
-#[derive(Debug, PartialEq)]
-pub enum StatusCodeKind {
-    /// Status code 125
-    DataConnectionOpenTransferStarted,
-    /// Status code 220
-    Ok,
-    /// Status code 226
-    RequestActionCompleted,
-    /// Status code 331
-    PasswordRequired,
-    /// Status code 230
-    UserLoggedIn,
-    /// Status code 227
-    EnteredPassiveMode,
-    Unknown,
-}
-
-#[derive(Debug, PartialEq)]
-struct StatusCode {
-    kind: StatusCodeKind,
-    code: u16,
-}
-
-impl StatusCode {
-    pub fn parse(text: &str) -> Self {
-        let code: &u16 = &text[0..3].parse().unwrap();
-        let code: u16 = *code;
-        let kind = match code {
-            125 => StatusCodeKind::DataConnectionOpenTransferStarted,
-            220 => StatusCodeKind::Ok,
-            226 => StatusCodeKind::RequestActionCompleted,
-            331 => StatusCodeKind::PasswordRequired,
-            230 => StatusCodeKind::UserLoggedIn,
-            227 => StatusCodeKind::EnteredPassiveMode,
-            _ => StatusCodeKind::Unknown,
-        };
-
-        Self { kind, code }
-    }
-
-    pub fn is_failure(&self) -> bool {
-        self.code > 399 && self.code < 599
-    }
-}
 
 #[derive(Debug, PartialEq)]
 pub struct ServerResponse {
@@ -58,18 +13,6 @@ impl ServerResponse {
     pub fn summarize(&self) -> String {
         format!("{}: {}", self.status_code.code, self.message)
     }
-}
-
-#[derive(Debug, Error)]
-pub enum ServerError {
-    /// IO Error
-    IoError(std::io::Error),
-    /// Server responded with failure
-    #[error(msg_embedded, no_from, non_std)]
-    FailureStatusCode(String),
-    /// Unexpected status code
-    #[error(msg_embedded, no_from, non_std)]
-    UnexpectedStatusCode(String),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -96,17 +39,17 @@ impl ServerResponse {
 
 pub struct Client {
     stream: BufReader<TcpStream>,
-    /// The data stream might be on a remote server
-    data_stream: Option<BufReader<TcpStream>>,
     buffer: String,
     welcome_string: Option<String>,
     mode: ClientMode,
-    /// Whether the current mode was set
-    mode_set: bool,
 }
 
 impl Client {
-    pub fn connect(hostname: &str, user: &str, password: &str) -> Result<Self, ServerError> {
+    pub fn connect(
+        hostname: &str,
+        user: &str,
+        password: &str,
+    ) -> Result<Self, crate::error::Error> {
         Self::connect_with_port(hostname, 21, user, password)
     }
 
@@ -115,7 +58,7 @@ impl Client {
         port: u32,
         user: &str,
         password: &str,
-    ) -> Result<Self, ServerError> {
+    ) -> Result<Self, crate::error::Error> {
         let host = format!("{}:{}", hostname, port);
         let raw_stream = TcpStream::connect(&host)?;
         let stream = BufReader::new(raw_stream);
@@ -124,13 +67,10 @@ impl Client {
         let mut client = Client {
             stream,
             buffer,
-            data_stream: None,
             welcome_string: None,
             mode: ClientMode::Passive,
-            /// Mode will be set on first command
-            mode_set: false,
         };
-        let response = client.read_reply_expecting(StatusCodeKind::Ok)?;
+        let response = client.read_reply_expecting(vec![StatusCodeKind::ReadyForNewUser])?;
         client.welcome_string = Some(response.message);
         client.login(user, password)?;
 
@@ -141,39 +81,156 @@ impl Client {
         self.welcome_string.as_ref()
     }
 
-    pub fn login(&mut self, user: &str, password: &str) -> Result<(), ServerError> {
-        self.write_unary_command("USER", user)?;
-        self.read_reply_expecting(StatusCodeKind::PasswordRequired)?;
-
-        self.write_unary_command("PASS", password)?;
-        self.read_reply_expecting(StatusCodeKind::UserLoggedIn)?;
-
-        self.set_mode()?;
+    pub fn login(&mut self, user: &str, password: &str) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting("USER", user, vec![StatusCodeKind::PasswordRequired])?;
+        self.write_unary_command_expecting("PASS", password, vec![StatusCodeKind::UserLoggedIn])?;
 
         Ok(())
     }
 
-    pub fn retrieve_file(&mut self, path: &str) -> Result<(), ServerError> {
-        self.write_unary_command("RETR", path)?;
-        self.read_reply_expecting(StatusCodeKind::DataConnectionOpenTransferStarted)?;
-
-        if let Some(ref mut conn) = self.data_stream {
-            let mut buffer = Vec::with_capacity(1024);
-            conn.read_to_end(&mut buffer)?;
-        }
-        self.read_reply_expecting(StatusCodeKind::RequestActionCompleted)?;
+    pub fn cwd(&mut self, dir: &str) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting(
+            "CWD",
+            dir,
+            vec![StatusCodeKind::RequestFileActionCompleted],
+        )?;
 
         Ok(())
     }
 
-    pub fn passive_mode(&mut self) -> Result<(), ServerError> {
-        self.write_command("PASV")?;
-        let response = self.read_reply_expecting(StatusCodeKind::EnteredPassiveMode)?;
-        let data_connection_socket = self.decode_passive_mode_ip(&response.message);
+    pub fn cdup(&mut self) -> Result<(), crate::error::Error> {
+        self.write_command_expecting("CDUP", vec![StatusCodeKind::RequestFileActionCompleted])?;
 
-        if let Some(socket) = data_connection_socket {
-            self.data_stream = Some(BufReader::new(TcpStream::connect(socket)?));
+        Ok(())
+    }
+
+    pub fn status(&mut self) -> Result<String, crate::error::Error> {
+        let response =
+            self.write_command_expecting("STAT", vec![StatusCodeKind::StatusCodeResponse])?;
+
+        Ok(response.message)
+    }
+
+    pub fn list(&mut self, path: &str) -> Result<String, crate::error::Error> {
+        match self.mode {
+            ClientMode::Passive => {
+                let mut conn = self.passive_mode_conn()?;
+
+                self.write_unary_command_expecting(
+                    "LIST",
+                    path,
+                    vec![
+                        StatusCodeKind::TransferStarted,
+                        StatusCodeKind::TransferAboutToStart,
+                    ],
+                )?;
+
+                let mut buffer = Vec::with_capacity(1024);
+                conn.read_to_end(&mut buffer)?;
+                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                let text = String::from_utf8(buffer).map_err(|_| {
+                    crate::error::Error::SerializationFailed(
+                        "Invalid ASCII returned on server directory listing.".to_string(),
+                    )
+                })?;
+                Ok(text)
+            }
+            ClientMode::Active => unimplemented!(),
         }
+    }
+
+    pub fn list_names(&mut self, path: &str) -> Result<Vec<String>, crate::error::Error> {
+        match self.mode {
+            ClientMode::Passive => {
+                let mut conn = self.passive_mode_conn()?;
+
+                self.write_unary_command_expecting(
+                    "NLST",
+                    path,
+                    vec![
+                        StatusCodeKind::TransferStarted,
+                        StatusCodeKind::TransferAboutToStart,
+                    ],
+                )?;
+
+                let mut buffer = Vec::with_capacity(1024);
+                conn.read_to_end(&mut buffer)?;
+                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                let text = String::from_utf8(buffer).map_err(|_| {
+                    crate::error::Error::SerializationFailed(
+                        "Invalid ASCII returned on server directory name listing.".to_string(),
+                    )
+                })?;
+                Ok(text.lines().map(|line| line.to_owned()).collect())
+            }
+            ClientMode::Active => unimplemented!(),
+        }
+    }
+
+    pub fn retrieve_file(&mut self, path: &str) -> Result<Vec<u8>, crate::error::Error> {
+        match self.mode {
+            ClientMode::Passive => {
+                let mut conn = self.passive_mode_conn()?;
+
+                self.write_unary_command_expecting(
+                    "RETR",
+                    path,
+                    vec![
+                        StatusCodeKind::TransferAboutToStart,
+                        StatusCodeKind::TransferStarted,
+                    ],
+                )?;
+
+                let mut buffer = Vec::with_capacity(1024);
+                conn.read_to_end(&mut buffer)?;
+                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                Ok(buffer)
+            }
+            ClientMode::Active => unimplemented!(),
+        }
+    }
+
+    pub fn passive_mode_conn(&mut self) -> Result<BufReader<TcpStream>, crate::error::Error> {
+        let response =
+            self.write_command_expecting("PASV", vec![StatusCodeKind::EnteredPassiveMode])?;
+        let socket = self.decode_passive_mode_ip(&response.message).ok_or(
+            crate::error::Error::InvalidSocketPassiveMode(
+                "Cannot parse socket sent from server for passive mode.".to_string(),
+            ),
+        )?;
+
+        Ok(BufReader::new(TcpStream::connect(socket)?))
+    }
+
+    pub fn write_unary_command_expecting(
+        &mut self,
+        cmd: &str,
+        arg: &str,
+        valid_statuses: Vec<StatusCodeKind>,
+    ) -> Result<ServerResponse, crate::error::Error> {
+        self.write_unary_command(cmd, arg)?;
+        self.read_reply_expecting(valid_statuses)
+    }
+
+    pub fn write_unary_command(&mut self, cmd: &str, arg: &str) -> Result<(), crate::error::Error> {
+        let text = format!("{} {}\r\n", cmd, arg);
+        self.stream.get_mut().write(text.as_bytes())?;
+
+        Ok(())
+    }
+
+    pub fn write_command_expecting(
+        &mut self,
+        cmd: &str,
+        valid_statuses: Vec<StatusCodeKind>,
+    ) -> Result<ServerResponse, crate::error::Error> {
+        self.write_command(cmd)?;
+        self.read_reply_expecting(valid_statuses)
+    }
+
+    pub fn write_command(&mut self, cmd: &str) -> Result<(), crate::error::Error> {
+        let text = format!("{}\r\n", cmd);
+        self.stream.get_mut().write(text.as_bytes())?;
 
         Ok(())
     }
@@ -200,48 +257,23 @@ impl Client {
         }
     }
 
-    fn write_unary_command(&mut self, cmd: &str, arg: &str) -> Result<(), ServerError> {
-        let text = format!("{} {}\r\n", cmd, arg);
-        self.stream.get_mut().write(text.as_bytes())?;
-
-        Ok(())
-    }
-
-    fn write_command(&mut self, cmd: &str) -> Result<(), ServerError> {
-        let text = format!("{}\r\n", cmd);
-        self.stream.get_mut().write(text.as_bytes())?;
-
-        Ok(())
-    }
-
-    fn set_mode(&mut self) -> Result<(), ServerError> {
-        if !self.mode_set {
-            self.mode_set = true;
-            match self.mode {
-                ClientMode::Passive => self.passive_mode(),
-                ClientMode::Active => unimplemented!(),
-            }
-        } else {
-            Ok(())
-        }
-    }
-
-    fn read_reply_expecting(
+    pub fn read_reply_expecting(
         &mut self,
-        expected_status_kind: StatusCodeKind,
-    ) -> Result<ServerResponse, ServerError> {
+        valid_statuses: Vec<StatusCodeKind>,
+    ) -> Result<ServerResponse, crate::error::Error> {
         let response = self.read_reply()?;
-
-        if response.status_code.kind == expected_status_kind {
+        if valid_statuses.contains(&response.status_code.kind) {
             Ok(response)
         } else if response.is_failure_status() {
-            Err(ServerError::FailureStatusCode(response.summarize()))
+            Err(crate::error::Error::FailureStatusCode(response.summarize()))
         } else {
-            Err(ServerError::UnexpectedStatusCode(response.summarize()))
+            Err(crate::error::Error::UnexpectedStatusCode(
+                response.summarize(),
+            ))
         }
     }
 
-    fn read_reply(&mut self) -> Result<ServerResponse, ServerError> {
+    pub fn read_reply(&mut self) -> Result<ServerResponse, crate::error::Error> {
         self.buffer.clear();
         self.stream.read_line(&mut self.buffer)?;
         Ok(ServerResponse::parse(&self.buffer))
