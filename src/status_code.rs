@@ -26,6 +26,8 @@ pub enum StatusCodeKind {
     UserLoggedIn,
     /// Status code 227
     EnteredPassiveMode,
+    /// Status code 550
+    RequestActionDenied,
     Unknown,
 }
 
@@ -45,15 +47,22 @@ impl From<u16> for StatusCodeKind {
             230 => StatusCodeKind::UserLoggedIn,
             250 => StatusCodeKind::RequestFileActionCompleted,
             331 => StatusCodeKind::PasswordRequired,
+            550 => StatusCodeKind::RequestActionDenied,
             _ => StatusCodeKind::Unknown,
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct StatusCode {
     pub kind: StatusCodeKind,
     pub code: u16,
+}
+
+impl PartialEq for StatusCode {
+    fn eq(&self, other: &StatusCode) -> bool {
+        self.code == other.code
+    }
 }
 
 impl StatusCode {

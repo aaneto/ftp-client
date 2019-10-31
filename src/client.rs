@@ -190,8 +190,28 @@ impl Client {
         path: &str,
         data: B,
     ) -> Result<(), crate::error::Error> {
-        unimplemented!();
-        Ok(())
+        match self.mode {
+            ClientMode::Passive => {
+                // Scope connection so it drops before reading server reply.
+                {
+                    let mut conn = self.passive_mode_conn()?;
+                    self.write_unary_command_expecting(
+                        "STOR",
+                        path,
+                        vec![
+                            StatusCodeKind::TransferStarted,
+                            StatusCodeKind::TransferAboutToStart,
+                        ],
+                    )?;
+                    conn.get_mut().write(&mut data.as_ref())?;
+                }
+
+                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+
+                Ok(())
+            }
+            ClientMode::Active => unimplemented!(),
+        }
     }
 
     pub fn store_unique<B: AsRef<[u8]>>(

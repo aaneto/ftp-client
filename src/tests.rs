@@ -70,3 +70,16 @@ fn test_help() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.help()
 }
+
+#[test]
+fn test_store() -> Result<(), crate::error::Error> {
+    let mut client = Client::connect(
+        "speedtest4.tele2.net",
+        "anonymous",
+        "anonymous@anonymous.com",
+    )?;
+    let file_data = b"Some data for you";
+    let file_name = "/upload/readyou.txt";
+
+    client.store(file_name, file_data)
+}
