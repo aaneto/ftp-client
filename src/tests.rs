@@ -83,3 +83,13 @@ fn test_store() -> Result<(), crate::error::Error> {
 
     client.store(file_name, file_data)
 }
+
+#[test]
+fn test_system() -> Result<(), crate::error::Error> {
+    let mut client = Client::connect("test.rebex.net", "demo", "password")?;
+    // Should be Windows_NT but we don't need to check that..
+    // since we don't want to break tests if the server changes OS
+    let _system_name = client.system()?;
+
+    Ok(())
+}

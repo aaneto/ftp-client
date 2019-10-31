@@ -280,9 +280,11 @@ impl Client {
         Ok(())
     }
 
-    pub fn system(&mut self) -> Result<(), crate::error::Error> {
-        unimplemented!();
-        Ok(())
+    pub fn system(&mut self) -> Result<String, crate::error::Error> {
+        let response =
+            self.write_command_expecting("SYST", vec![StatusCodeKind::NameSystemType])?;
+
+        Ok(response.message)
     }
 
     pub fn delete_file(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {

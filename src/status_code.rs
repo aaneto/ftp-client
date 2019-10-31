@@ -12,6 +12,8 @@ pub enum StatusCodeKind {
     SystemStatus,
     /// Status code 214
     HelpMessage,
+    /// Status code 215
+    NameSystemType,
     /// Status code 220
     ReadyForNewUser,
     /// Status code 221
@@ -40,6 +42,7 @@ impl From<u16> for StatusCodeKind {
             202 => StatusCodeKind::FeatureNotImplemented,
             211 => StatusCodeKind::SystemStatus,
             214 => StatusCodeKind::HelpMessage,
+            215 => StatusCodeKind::NameSystemType,
             221 => StatusCodeKind::ClosingControlConnection,
             220 => StatusCodeKind::ReadyForNewUser,
             226 => StatusCodeKind::RequestActionCompleted,
