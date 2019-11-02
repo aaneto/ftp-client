@@ -30,6 +30,10 @@ pub enum StatusCodeKind {
     EnteredExtendedPassiveMode,
     /// Status code 331
     PasswordRequired,
+    /// Status code 500
+    CommandUnrecognized,
+    /// Status code 504
+    SecurityMechanismNotImplemented,
     /// Status code 550
     RequestActionDenied,
     Unknown,
@@ -53,6 +57,8 @@ impl From<u16> for StatusCodeKind {
             230 => StatusCodeKind::UserLoggedIn,
             250 => StatusCodeKind::RequestFileActionCompleted,
             331 => StatusCodeKind::PasswordRequired,
+            500 => StatusCodeKind::CommandUnrecognized,
+            504 => StatusCodeKind::SecurityMechanismNotImplemented,
             550 => StatusCodeKind::RequestActionDenied,
             _ => StatusCodeKind::Unknown,
         }
