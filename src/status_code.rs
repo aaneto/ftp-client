@@ -22,12 +22,14 @@ pub enum StatusCodeKind {
     RequestActionCompleted,
     /// Status code 250
     RequestFileActionCompleted,
-    /// Status code 331
-    PasswordRequired,
     /// Status code 230
     UserLoggedIn,
     /// Status code 227
     EnteredPassiveMode,
+    /// Status code 229
+    EnteredExtendedPassiveMode,
+    /// Status code 331
+    PasswordRequired,
     /// Status code 550
     RequestActionDenied,
     Unknown,
@@ -47,6 +49,7 @@ impl From<u16> for StatusCodeKind {
             220 => StatusCodeKind::ReadyForNewUser,
             226 => StatusCodeKind::RequestActionCompleted,
             227 => StatusCodeKind::EnteredPassiveMode,
+            229 => StatusCodeKind::EnteredExtendedPassiveMode,
             230 => StatusCodeKind::UserLoggedIn,
             250 => StatusCodeKind::RequestFileActionCompleted,
             331 => StatusCodeKind::PasswordRequired,

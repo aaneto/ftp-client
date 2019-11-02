@@ -18,6 +18,7 @@ impl ServerResponse {
 #[derive(Debug, Clone, Copy)]
 pub enum ClientMode {
     Passive,
+    ExtendedPassive,
     Active,
 }
 
@@ -68,7 +69,7 @@ impl Client {
             stream,
             buffer,
             welcome_string: None,
-            mode: ClientMode::Passive,
+            mode: ClientMode::ExtendedPassive,
         };
         let response = client.read_reply_expecting(vec![StatusCodeKind::ReadyForNewUser])?;
         client.welcome_string = Some(response.message);
@@ -131,6 +132,28 @@ impl Client {
 
     pub fn list(&mut self, path: &str) -> Result<String, crate::error::Error> {
         match self.mode {
+            ClientMode::ExtendedPassive => {
+                let mut conn = self.extended_passive_mode_conn()?;
+
+                self.write_unary_command_expecting(
+                    "LIST",
+                    path,
+                    vec![
+                        StatusCodeKind::TransferStarted,
+                        StatusCodeKind::TransferAboutToStart,
+                    ],
+                )?;
+
+                let mut buffer = Vec::with_capacity(1024);
+                conn.read_to_end(&mut buffer)?;
+                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                let text = String::from_utf8(buffer).map_err(|_| {
+                    crate::error::Error::SerializationFailed(
+                        "Invalid ASCII returned on server directory listing.".to_string(),
+                    )
+                })?;
+                Ok(text)
+            }
             ClientMode::Passive => {
                 let mut conn = self.passive_mode_conn()?;
 
@@ -159,6 +182,28 @@ impl Client {
 
     pub fn list_names(&mut self, path: &str) -> Result<Vec<String>, crate::error::Error> {
         match self.mode {
+            ClientMode::ExtendedPassive => {
+                let mut conn = self.extended_passive_mode_conn()?;
+
+                self.write_unary_command_expecting(
+                    "NLST",
+                    path,
+                    vec![
+                        StatusCodeKind::TransferStarted,
+                        StatusCodeKind::TransferAboutToStart,
+                    ],
+                )?;
+
+                let mut buffer = Vec::with_capacity(1024);
+                conn.read_to_end(&mut buffer)?;
+                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                let text = String::from_utf8(buffer).map_err(|_| {
+                    crate::error::Error::SerializationFailed(
+                        "Invalid ASCII returned on server directory name listing.".to_string(),
+                    )
+                })?;
+                Ok(text.lines().map(|line| line.to_owned()).collect())
+            }
             ClientMode::Passive => {
                 let mut conn = self.passive_mode_conn()?;
 
@@ -191,6 +236,25 @@ impl Client {
         data: B,
     ) -> Result<(), crate::error::Error> {
         match self.mode {
+            ClientMode::ExtendedPassive => {
+                // Scope connection so it drops before reading server reply.
+                {
+                    let mut conn = self.extended_passive_mode_conn()?;
+                    self.write_unary_command_expecting(
+                        "STOR",
+                        path,
+                        vec![
+                            StatusCodeKind::TransferStarted,
+                            StatusCodeKind::TransferAboutToStart,
+                        ],
+                    )?;
+                    conn.get_mut().write(&mut data.as_ref())?;
+                }
+
+                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+
+                Ok(())
+            }
             ClientMode::Passive => {
                 // Scope connection so it drops before reading server reply.
                 {
@@ -216,68 +280,58 @@ impl Client {
 
     pub fn store_unique<B: AsRef<[u8]>>(
         &mut self,
-        path: &str,
-        data: B,
+        _path: &str,
+        _data: B,
     ) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
     pub fn append<B: AsRef<[u8]>>(
         &mut self,
-        path: &str,
-        data: B,
+        _path: &str,
+        _data: B,
     ) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
     pub fn restart(&mut self) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
     pub fn abort(&mut self) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
     pub fn allocate(
         &mut self,
-        logical_size: usize,
-        logical_page_size: Option<usize>,
+        _logical_size: usize,
+        _logical_page_size: Option<usize>,
     ) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
     pub fn rename_file(
         &mut self,
-        path_from: &str,
-        path_to: &str,
+        _path_from: &str,
+        _path_to: &str,
     ) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
-    pub fn remove_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+    pub fn remove_directory(&mut self, _dir_path: &str) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
-    pub fn make_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+    pub fn make_directory(&mut self, _dir_path: &str) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
     pub fn pwd(&mut self) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
     pub fn site_parameters(&mut self) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
     pub fn system(&mut self) -> Result<String, crate::error::Error> {
@@ -287,13 +341,29 @@ impl Client {
         Ok(response.message)
     }
 
-    pub fn delete_file(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+    pub fn delete_file(&mut self, _dir_path: &str) -> Result<(), crate::error::Error> {
         unimplemented!();
-        Ok(())
     }
 
     pub fn retrieve_file(&mut self, path: &str) -> Result<Vec<u8>, crate::error::Error> {
         match self.mode {
+            ClientMode::ExtendedPassive => {
+                let mut conn = self.extended_passive_mode_conn()?;
+
+                self.write_unary_command_expecting(
+                    "RETR",
+                    path,
+                    vec![
+                        StatusCodeKind::TransferAboutToStart,
+                        StatusCodeKind::TransferStarted,
+                    ],
+                )?;
+
+                let mut buffer = Vec::with_capacity(1024);
+                conn.read_to_end(&mut buffer)?;
+                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                Ok(buffer)
+            }
             ClientMode::Passive => {
                 let mut conn = self.passive_mode_conn()?;
 
@@ -313,6 +383,16 @@ impl Client {
             }
             ClientMode::Active => unimplemented!(),
         }
+    }
+
+    pub fn extended_passive_mode_conn(
+        &mut self,
+    ) -> Result<BufReader<TcpStream>, crate::error::Error> {
+        let response =
+            self.write_command_expecting("EPSV", vec![StatusCodeKind::EnteredExtendedPassiveMode])?;
+        let socket = self.decode_extended_passive_mode_socket(&response.message)?;
+
+        Ok(BufReader::new(TcpStream::connect(socket)?))
     }
 
     pub fn passive_mode_conn(&mut self) -> Result<BufReader<TcpStream>, crate::error::Error> {
@@ -379,6 +459,35 @@ impl Client {
                 ))
             }
             _ => None,
+        }
+    }
+
+    pub fn decode_extended_passive_mode_socket(
+        &self,
+        response: &str,
+    ) -> Result<std::net::SocketAddr, crate::error::Error> {
+        let first_delimiter = response.find("|||");
+        let second_delimiter = response.rfind('|');
+        let cant_parse_error = || {
+            crate::error::Error::InvalidSocketPassiveMode(
+                "Cannot parse socket sent from server for passive mode.".to_string(),
+            )
+        };
+
+        match (first_delimiter, second_delimiter) {
+            (Some(start), Some(end)) => {
+                let port: u16 = response[start + 3..end]
+                    .parse()
+                    .map_err(move |_| cant_parse_error())?;
+                let ip = self
+                    .stream
+                    .get_ref()
+                    .peer_addr()
+                    .map_err(move |_| cant_parse_error())?
+                    .ip();
+                Ok(std::net::SocketAddr::new(ip, port))
+            }
+            _ => Err(cant_parse_error()),
         }
     }
 

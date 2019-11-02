@@ -93,3 +93,16 @@ fn test_system() -> Result<(), crate::error::Error> {
 
     Ok(())
 }
+
+#[test]
+fn test_ipv6() -> Result<(), crate::error::Error> {
+    let mut client = Client::connect(
+        "speedtest6.tele2.net",
+        "anonymous",
+        "anonymous@anonymous.com",
+    )?;
+
+    let data = b"DATA";
+    let file_path = "/upload/readyou.txt";
+    client.store(file_path, data)
+}
