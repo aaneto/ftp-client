@@ -209,103 +209,47 @@ impl Client {
     }
 
     pub fn list(&mut self, path: &str) -> Result<String, crate::error::Error> {
-        match self.mode {
-            ClientMode::ExtendedPassive => {
-                let mut conn = self.extended_passive_mode_conn()?;
+        let mut conn = self.get_data_connection()?;
+        self.write_unary_command_expecting(
+            "LIST",
+            path,
+            vec![
+                StatusCodeKind::TransferStarted,
+                StatusCodeKind::TransferAboutToStart,
+            ],
+        )?;
 
-                self.write_unary_command_expecting(
-                    "LIST",
-                    path,
-                    vec![
-                        StatusCodeKind::TransferStarted,
-                        StatusCodeKind::TransferAboutToStart,
-                    ],
-                )?;
-
-                let mut buffer = Vec::with_capacity(1024);
-                conn.read_to_end(&mut buffer)?;
-                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
-                let text = String::from_utf8(buffer).map_err(|_| {
-                    crate::error::Error::SerializationFailed(
-                        "Invalid ASCII returned on server directory listing.".to_string(),
-                    )
-                })?;
-                Ok(text)
-            }
-            ClientMode::Passive => {
-                let mut conn = self.passive_mode_conn()?;
-
-                self.write_unary_command_expecting(
-                    "LIST",
-                    path,
-                    vec![
-                        StatusCodeKind::TransferStarted,
-                        StatusCodeKind::TransferAboutToStart,
-                    ],
-                )?;
-
-                let mut buffer = Vec::with_capacity(1024);
-                conn.read_to_end(&mut buffer)?;
-                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
-                let text = String::from_utf8(buffer).map_err(|_| {
-                    crate::error::Error::SerializationFailed(
-                        "Invalid ASCII returned on server directory listing.".to_string(),
-                    )
-                })?;
-                Ok(text)
-            }
-            ClientMode::Active => unimplemented!(),
-        }
+        let mut buffer = Vec::with_capacity(1024);
+        conn.read_to_end(&mut buffer)?;
+        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+        let text = String::from_utf8(buffer).map_err(|_| {
+            crate::error::Error::SerializationFailed(
+                "Invalid ASCII returned on server directory listing.".to_string(),
+            )
+        })?;
+        Ok(text)
     }
 
     pub fn list_names(&mut self, path: &str) -> Result<Vec<String>, crate::error::Error> {
-        match self.mode {
-            ClientMode::ExtendedPassive => {
-                let mut conn = self.extended_passive_mode_conn()?;
+        let mut conn = self.get_data_connection()?;
+        self.write_unary_command_expecting(
+            "NLST",
+            path,
+            vec![
+                StatusCodeKind::TransferStarted,
+                StatusCodeKind::TransferAboutToStart,
+            ],
+        )?;
 
-                self.write_unary_command_expecting(
-                    "NLST",
-                    path,
-                    vec![
-                        StatusCodeKind::TransferStarted,
-                        StatusCodeKind::TransferAboutToStart,
-                    ],
-                )?;
-
-                let mut buffer = Vec::with_capacity(1024);
-                conn.read_to_end(&mut buffer)?;
-                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
-                let text = String::from_utf8(buffer).map_err(|_| {
-                    crate::error::Error::SerializationFailed(
-                        "Invalid ASCII returned on server directory name listing.".to_string(),
-                    )
-                })?;
-                Ok(text.lines().map(|line| line.to_owned()).collect())
-            }
-            ClientMode::Passive => {
-                let mut conn = self.passive_mode_conn()?;
-
-                self.write_unary_command_expecting(
-                    "NLST",
-                    path,
-                    vec![
-                        StatusCodeKind::TransferStarted,
-                        StatusCodeKind::TransferAboutToStart,
-                    ],
-                )?;
-
-                let mut buffer = Vec::with_capacity(1024);
-                conn.read_to_end(&mut buffer)?;
-                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
-                let text = String::from_utf8(buffer).map_err(|_| {
-                    crate::error::Error::SerializationFailed(
-                        "Invalid ASCII returned on server directory name listing.".to_string(),
-                    )
-                })?;
-                Ok(text.lines().map(|line| line.to_owned()).collect())
-            }
-            ClientMode::Active => unimplemented!(),
-        }
+        let mut buffer = Vec::with_capacity(1024);
+        conn.read_to_end(&mut buffer)?;
+        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+        let text = String::from_utf8(buffer).map_err(|_| {
+            crate::error::Error::SerializationFailed(
+                "Invalid ASCII returned on server directory name listing.".to_string(),
+            )
+        })?;
+        Ok(text.lines().map(|line| line.to_owned()).collect())
     }
 
     pub fn store<B: AsRef<[u8]>>(
@@ -313,47 +257,23 @@ impl Client {
         path: &str,
         data: B,
     ) -> Result<(), crate::error::Error> {
-        match self.mode {
-            ClientMode::ExtendedPassive => {
-                // Scope connection so it drops before reading server reply.
-                {
-                    let mut conn = self.extended_passive_mode_conn()?;
-                    self.write_unary_command_expecting(
-                        "STOR",
-                        path,
-                        vec![
-                            StatusCodeKind::TransferStarted,
-                            StatusCodeKind::TransferAboutToStart,
-                        ],
-                    )?;
-                    conn.get_mut().write(&mut data.as_ref())?;
-                }
-
-                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
-
-                Ok(())
-            }
-            ClientMode::Passive => {
-                // Scope connection so it drops before reading server reply.
-                {
-                    let mut conn = self.passive_mode_conn()?;
-                    self.write_unary_command_expecting(
-                        "STOR",
-                        path,
-                        vec![
-                            StatusCodeKind::TransferStarted,
-                            StatusCodeKind::TransferAboutToStart,
-                        ],
-                    )?;
-                    conn.get_mut().write(&mut data.as_ref())?;
-                }
-
-                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
-
-                Ok(())
-            }
-            ClientMode::Active => unimplemented!(),
+        // Scope connection so it drops before reading server reply.
+        {
+            let mut conn = self.get_data_connection()?;
+            self.write_unary_command_expecting(
+                "STOR",
+                path,
+                vec![
+                    StatusCodeKind::TransferStarted,
+                    StatusCodeKind::TransferAboutToStart,
+                ],
+            )?;
+            conn.get_mut().write(&mut data.as_ref())?;
         }
+
+        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+
+        Ok(())
     }
 
     pub fn store_unique<B: AsRef<[u8]>>(
@@ -424,46 +344,31 @@ impl Client {
     }
 
     pub fn retrieve_file(&mut self, path: &str) -> Result<Vec<u8>, crate::error::Error> {
+        let mut conn = self.get_data_connection()?;
+        self.write_unary_command_expecting(
+            "RETR",
+            path,
+            vec![
+                StatusCodeKind::TransferAboutToStart,
+                StatusCodeKind::TransferStarted,
+            ],
+        )?;
+
+        let mut buffer = Vec::with_capacity(1024);
+        conn.read_to_end(&mut buffer)?;
+        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+        Ok(buffer)
+    }
+
+    pub fn get_data_connection(&mut self) -> Result<BufReader<TcpStream>, crate::error::Error> {
         match self.mode {
-            ClientMode::ExtendedPassive => {
-                let mut conn = self.extended_passive_mode_conn()?;
-
-                self.write_unary_command_expecting(
-                    "RETR",
-                    path,
-                    vec![
-                        StatusCodeKind::TransferAboutToStart,
-                        StatusCodeKind::TransferStarted,
-                    ],
-                )?;
-
-                let mut buffer = Vec::with_capacity(1024);
-                conn.read_to_end(&mut buffer)?;
-                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
-                Ok(buffer)
-            }
-            ClientMode::Passive => {
-                let mut conn = self.passive_mode_conn()?;
-
-                self.write_unary_command_expecting(
-                    "RETR",
-                    path,
-                    vec![
-                        StatusCodeKind::TransferAboutToStart,
-                        StatusCodeKind::TransferStarted,
-                    ],
-                )?;
-
-                let mut buffer = Vec::with_capacity(1024);
-                conn.read_to_end(&mut buffer)?;
-                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
-                Ok(buffer)
-            }
             ClientMode::Active => unimplemented!(),
+            ClientMode::Passive => self.passive_mode_connection(),
+            ClientMode::ExtendedPassive => self.extended_passive_mode_connection(),
         }
     }
 
-    pub fn extended_passive_mode_conn(
+    pub fn extended_passive_mode_connection(
         &mut self,
     ) -> Result<BufReader<TcpStream>, crate::error::Error> {
         let response =
@@ -473,7 +378,7 @@ impl Client {
         Ok(BufReader::new(TcpStream::connect(socket)?))
     }
 
-    pub fn passive_mode_conn(&mut self) -> Result<BufReader<TcpStream>, crate::error::Error> {
+    pub fn passive_mode_connection(&mut self) -> Result<BufReader<TcpStream>, crate::error::Error> {
         let response =
             self.write_command_expecting("PASV", vec![StatusCodeKind::EnteredPassiveMode])?;
         let socket = self.decode_passive_mode_ip(&response.message)?;
