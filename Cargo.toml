@@ -8,3 +8,5 @@ edition = "2018"
 
 [dependencies]
 derive-error = "0.0.4"
+native-tls = "0.2.3"
+derive_more = "0.15.0"
