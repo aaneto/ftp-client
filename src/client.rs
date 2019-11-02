@@ -149,7 +149,7 @@ impl Client {
             welcome_string: None,
             mode: ClientMode::ExtendedPassive,
         };
-        let response = client.read_reply_expecting(vec![StatusCodeKind::ReadyForNewUser])?;
+        let response = client.parse_reply_expecting(vec![StatusCodeKind::ReadyForNewUser])?;
         client.welcome_string = Some(response.message);
         client.login(user, password)?;
 
@@ -224,7 +224,7 @@ impl Client {
 
                 let mut buffer = Vec::with_capacity(1024);
                 conn.read_to_end(&mut buffer)?;
-                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
                 let text = String::from_utf8(buffer).map_err(|_| {
                     crate::error::Error::SerializationFailed(
                         "Invalid ASCII returned on server directory listing.".to_string(),
@@ -246,7 +246,7 @@ impl Client {
 
                 let mut buffer = Vec::with_capacity(1024);
                 conn.read_to_end(&mut buffer)?;
-                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
                 let text = String::from_utf8(buffer).map_err(|_| {
                     crate::error::Error::SerializationFailed(
                         "Invalid ASCII returned on server directory listing.".to_string(),
@@ -274,7 +274,7 @@ impl Client {
 
                 let mut buffer = Vec::with_capacity(1024);
                 conn.read_to_end(&mut buffer)?;
-                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
                 let text = String::from_utf8(buffer).map_err(|_| {
                     crate::error::Error::SerializationFailed(
                         "Invalid ASCII returned on server directory name listing.".to_string(),
@@ -296,7 +296,7 @@ impl Client {
 
                 let mut buffer = Vec::with_capacity(1024);
                 conn.read_to_end(&mut buffer)?;
-                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
                 let text = String::from_utf8(buffer).map_err(|_| {
                     crate::error::Error::SerializationFailed(
                         "Invalid ASCII returned on server directory name listing.".to_string(),
@@ -329,7 +329,7 @@ impl Client {
                     conn.get_mut().write(&mut data.as_ref())?;
                 }
 
-                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
 
                 Ok(())
             }
@@ -348,7 +348,7 @@ impl Client {
                     conn.get_mut().write(&mut data.as_ref())?;
                 }
 
-                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
 
                 Ok(())
             }
@@ -439,7 +439,7 @@ impl Client {
 
                 let mut buffer = Vec::with_capacity(1024);
                 conn.read_to_end(&mut buffer)?;
-                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
                 Ok(buffer)
             }
             ClientMode::Passive => {
@@ -456,7 +456,7 @@ impl Client {
 
                 let mut buffer = Vec::with_capacity(1024);
                 conn.read_to_end(&mut buffer)?;
-                self.read_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+                self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
                 Ok(buffer)
             }
             ClientMode::Active => unimplemented!(),
@@ -476,11 +476,7 @@ impl Client {
     pub fn passive_mode_conn(&mut self) -> Result<BufReader<TcpStream>, crate::error::Error> {
         let response =
             self.write_command_expecting("PASV", vec![StatusCodeKind::EnteredPassiveMode])?;
-        let socket = self.decode_passive_mode_ip(&response.message).ok_or(
-            crate::error::Error::InvalidSocketPassiveMode(
-                "Cannot parse socket sent from server for passive mode.".to_string(),
-            ),
-        )?;
+        let socket = self.decode_passive_mode_ip(&response.message)?;
 
         Ok(BufReader::new(TcpStream::connect(socket)?))
     }
@@ -492,7 +488,7 @@ impl Client {
         valid_statuses: Vec<StatusCodeKind>,
     ) -> Result<ServerResponse, crate::error::Error> {
         self.write_unary_command(cmd, arg)?;
-        self.read_reply_expecting(valid_statuses)
+        self.parse_reply_expecting(valid_statuses)
     }
 
     pub fn write_unary_command(&mut self, cmd: &str, arg: &str) -> Result<(), crate::error::Error> {
@@ -508,7 +504,7 @@ impl Client {
         valid_statuses: Vec<StatusCodeKind>,
     ) -> Result<ServerResponse, crate::error::Error> {
         self.write_command(cmd)?;
-        self.read_reply_expecting(valid_statuses)
+        self.parse_reply_expecting(valid_statuses)
     }
 
     pub fn write_command(&mut self, cmd: &str) -> Result<(), crate::error::Error> {
@@ -518,25 +514,38 @@ impl Client {
         Ok(())
     }
 
-    fn decode_passive_mode_ip(&self, message: &str) -> Option<std::net::SocketAddrV4> {
+    fn decode_passive_mode_ip(
+        &self,
+        message: &str,
+    ) -> Result<std::net::SocketAddrV4, crate::error::Error> {
         let first_bracket = message.find('(');
         let second_bracket = message.find(')');
+        let cant_parse_error = || {
+            crate::error::Error::InvalidSocketPassiveMode(
+                "Cannot parse socket sent from server for passive mode.".to_string(),
+            )
+        };
 
         match (first_bracket, second_bracket) {
             (Some(start), Some(end)) => {
                 // We are dealing with ASCII strings only on this point, so +1 is okay.
                 let nums: Vec<u8> = message[start + 1..end]
                     .split(',')
-                    .map(|val| val.parse().unwrap())
+                    // Try to parse all digits between ','
+                    .flat_map(|val| val.parse())
                     .collect();
-                let ip = std::net::Ipv4Addr::new(nums[0], nums[1], nums[2], nums[3]);
+                if nums.len() < 4 {
+                    Err(cant_parse_error())
+                } else {
+                    let ip = std::net::Ipv4Addr::new(nums[0], nums[1], nums[2], nums[3]);
 
-                Some(std::net::SocketAddrV4::new(
-                    ip,
-                    256 * nums[4] as u16 + nums[5] as u16,
-                ))
+                    Ok(std::net::SocketAddrV4::new(
+                        ip,
+                        256 * nums[4] as u16 + nums[5] as u16,
+                    ))
+                }
             }
-            _ => None,
+            _ => Err(cant_parse_error()),
         }
     }
 
@@ -569,11 +578,11 @@ impl Client {
         }
     }
 
-    pub fn read_reply_expecting(
+    pub fn parse_reply_expecting(
         &mut self,
         valid_statuses: Vec<StatusCodeKind>,
     ) -> Result<ServerResponse, crate::error::Error> {
-        let response = self.read_reply()?;
+        let response = self.parse_reply()?;
         if valid_statuses.contains(&response.status_code.kind) {
             Ok(response)
         } else if response.is_failure_status() {
@@ -585,9 +594,15 @@ impl Client {
         }
     }
 
-    pub fn read_reply(&mut self) -> Result<ServerResponse, crate::error::Error> {
+    pub fn parse_reply(&mut self) -> Result<ServerResponse, crate::error::Error> {
         self.buffer.clear();
         self.stream.read_line(&mut self.buffer)?;
         Ok(ServerResponse::parse(&self.buffer))
+    }
+
+    pub fn read_reply(&mut self) -> Result<String, crate::error::Error> {
+        self.buffer.clear();
+        self.stream.read_line(&mut self.buffer)?;
+        Ok(self.buffer.clone())
     }
 }
