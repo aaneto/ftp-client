@@ -1,4 +1,6 @@
 use derive_error::Error;
+use native_tls::{Error as TlsError, HandshakeError};
+use std::net::TcpStream;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -16,4 +18,8 @@ pub enum Error {
     /// Invalid socket IP from passive mode
     #[error(msg_embedded, no_from, non_std)]
     InvalidSocketPassiveMode(String),
+    /// Error on TLS handshake
+    TlsHandshakeError(HandshakeError<TcpStream>),
+    /// Error while creating TLS connector
+    TlsError(TlsError),
 }

@@ -106,3 +106,11 @@ fn test_ipv6() -> Result<(), crate::error::Error> {
     let file_path = "/upload/readyou.txt";
     client.store(file_path, data)
 }
+
+#[test]
+fn test_tls() -> Result<(), crate::error::Error> {
+    let mut client = Client::connect("test.rebex.net", "demo", "password")?;
+    // Run random command just to assert we are communicating
+    let _system_name = client.system()?;
+    Ok(())
+}

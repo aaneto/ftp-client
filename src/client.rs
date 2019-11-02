@@ -1,6 +1,9 @@
 use crate::status_code::{StatusCode, StatusCodeKind};
+use derive_more::From;
+use native_tls::{TlsConnector, TlsStream};
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::io::{Read, Write};
 use std::net::TcpStream;
 
 #[derive(Debug, PartialEq)]
@@ -38,8 +41,48 @@ impl ServerResponse {
     }
 }
 
+#[derive(From)]
+enum ClientStream {
+    TcpStream(TcpStream),
+    TlsStream(TlsStream<TcpStream>),
+}
+
+impl ClientStream {
+    pub fn peer_addr(&self) -> Result<std::net::SocketAddr, std::io::Error> {
+        match self {
+            ClientStream::TcpStream(stream) => stream.peer_addr(),
+            ClientStream::TlsStream(stream) => stream.get_ref().peer_addr(),
+        }
+    }
+}
+
+impl Read for ClientStream {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        match self {
+            ClientStream::TcpStream(stream) => stream.read(buf),
+            ClientStream::TlsStream(stream) => stream.read(buf),
+        }
+    }
+}
+
+impl Write for ClientStream {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
+        match self {
+            ClientStream::TcpStream(stream) => stream.write(buf),
+            ClientStream::TlsStream(stream) => stream.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> Result<(), std::io::Error> {
+        match self {
+            ClientStream::TcpStream(stream) => stream.flush(),
+            ClientStream::TlsStream(stream) => stream.flush(),
+        }
+    }
+}
+
 pub struct Client {
-    stream: BufReader<TcpStream>,
+    stream: BufReader<ClientStream>,
     buffer: String,
     welcome_string: Option<String>,
     mode: ClientMode,
@@ -54,6 +97,41 @@ impl Client {
         Self::connect_with_port(hostname, 21, user, password)
     }
 
+    pub fn connect_tls(
+        hostname: &str,
+        user: &str,
+        password: &str,
+    ) -> Result<Self, crate::error::Error> {
+        Self::connect_tls_with_port(hostname, 21, user, password)
+    }
+
+    pub fn connect_tls_with_port(
+        hostname: &str,
+        port: u32,
+        user: &str,
+        password: &str,
+    ) -> Result<Self, crate::error::Error> {
+        let connector = TlsConnector::new()?;
+
+        let host = format!("{}:{}", hostname, port);
+        let raw_stream = TcpStream::connect(&host)?;
+        let tls_stream = connector.connect(&host, raw_stream)?;
+        let stream: BufReader<ClientStream> = BufReader::new(tls_stream.into());
+
+        let buffer = String::new();
+        let mut client = Client {
+            stream,
+            buffer,
+            welcome_string: None,
+            mode: ClientMode::ExtendedPassive,
+        };
+        let response = client.parse_reply_expecting(vec![StatusCodeKind::ReadyForNewUser])?;
+        client.welcome_string = Some(response.message);
+        client.login(user, password)?;
+
+        Ok(client)
+    }
+
     pub fn connect_with_port(
         hostname: &str,
         port: u32,
@@ -62,7 +140,7 @@ impl Client {
     ) -> Result<Self, crate::error::Error> {
         let host = format!("{}:{}", hostname, port);
         let raw_stream = TcpStream::connect(&host)?;
-        let stream = BufReader::new(raw_stream);
+        let stream = BufReader::new(raw_stream.into());
 
         let buffer = String::new();
         let mut client = Client {
