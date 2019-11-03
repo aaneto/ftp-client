@@ -114,3 +114,29 @@ fn test_tls() -> Result<(), crate::error::Error> {
     let _system_name = client.system()?;
     Ok(())
 }
+
+#[test]
+fn test_rename_file() {
+    run_with_server(|| {
+        let mut client = Client::connect("localhost", "user", "user")?;
+        client.store("testfile", b"DATA")?;
+        client.rename_file("testfile", "testfile.txt")?;
+
+        Ok(())
+    });
+}
+
+fn run_with_server<F: Fn() -> Result<(), crate::error::Error>>(func: F) {
+    // Reset server data
+    std::fs::remove_dir_all("res").unwrap();
+    std::fs::create_dir("res").unwrap();
+
+    let mut child = std::process::Command::new("python")
+        .arg("src/sample_server.py")
+        .spawn()
+        .unwrap();
+    let result = func();
+    // Clean up before running unwrap on test result
+    child.kill().unwrap();
+    result.unwrap();
+}

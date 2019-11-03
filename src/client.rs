@@ -13,8 +13,11 @@ pub struct ServerResponse {
 }
 
 impl ServerResponse {
-    pub fn summarize(&self) -> String {
-        format!("{}: {}", self.status_code.code, self.message)
+    pub fn summarize_error(&self, expected: Vec<StatusCodeKind>) -> String {
+        format!(
+            "Got {}: {}, expected {:?}",
+            self.status_code.code, self.message, expected
+        )
     }
 }
 
@@ -310,10 +313,21 @@ impl Client {
 
     pub fn rename_file(
         &mut self,
-        _path_from: &str,
-        _path_to: &str,
+        path_from: &str,
+        path_to: &str,
     ) -> Result<(), crate::error::Error> {
-        unimplemented!();
+        self.write_unary_command_expecting(
+            "RNFR",
+            path_from,
+            vec![StatusCodeKind::RequestActionPending],
+        )?;
+        self.write_unary_command_expecting(
+            "RNTO",
+            path_to,
+            vec![StatusCodeKind::RequestFileActionCompleted],
+        )?;
+
+        Ok(())
     }
 
     pub fn remove_directory(&mut self, _dir_path: &str) -> Result<(), crate::error::Error> {
@@ -426,9 +440,10 @@ impl Client {
         let first_bracket = message.find('(');
         let second_bracket = message.find(')');
         let cant_parse_error = || {
-            crate::error::Error::InvalidSocketPassiveMode(
-                "Cannot parse socket sent from server for passive mode.".to_string(),
-            )
+            crate::error::Error::InvalidSocketPassiveMode(format!(
+                "Cannot parse socket sent from server for passive mode: {}.",
+                message
+            ))
         };
 
         match (first_bracket, second_bracket) {
@@ -461,9 +476,10 @@ impl Client {
         let first_delimiter = response.find("|||");
         let second_delimiter = response.rfind('|');
         let cant_parse_error = || {
-            crate::error::Error::InvalidSocketPassiveMode(
-                "Cannot parse socket sent from server for passive mode.".to_string(),
-            )
+            crate::error::Error::InvalidSocketPassiveMode(format!(
+                "Cannot parse socket sent from server for passive mode: {}.",
+                response
+            ))
         };
 
         match (first_delimiter, second_delimiter) {
@@ -490,11 +506,9 @@ impl Client {
         let response = self.parse_reply()?;
         if valid_statuses.contains(&response.status_code.kind) {
             Ok(response)
-        } else if response.is_failure_status() {
-            Err(crate::error::Error::FailureStatusCode(response.summarize()))
         } else {
             Err(crate::error::Error::UnexpectedStatusCode(
-                response.summarize(),
+                response.summarize_error(valid_statuses),
             ))
         }
     }

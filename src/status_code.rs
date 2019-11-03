@@ -20,22 +20,26 @@ pub enum StatusCodeKind {
     ClosingControlConnection,
     /// Status code 226
     RequestActionCompleted,
-    /// Status code 250
-    RequestFileActionCompleted,
     /// Status code 230
     UserLoggedIn,
     /// Status code 227
     EnteredPassiveMode,
     /// Status code 229
     EnteredExtendedPassiveMode,
+    /// Status code 250
+    RequestFileActionCompleted,
     /// Status code 331
     PasswordRequired,
+    /// Status code 350
+    RequestActionPending,
     /// Status code 500
     CommandUnrecognized,
     /// Status code 504
     SecurityMechanismNotImplemented,
     /// Status code 550
     RequestActionDenied,
+    /// Status code 553
+    FileNameNotAllowed,
     Unknown,
 }
 
@@ -57,9 +61,11 @@ impl From<u16> for StatusCodeKind {
             230 => StatusCodeKind::UserLoggedIn,
             250 => StatusCodeKind::RequestFileActionCompleted,
             331 => StatusCodeKind::PasswordRequired,
+            350 => StatusCodeKind::RequestActionPending,
             500 => StatusCodeKind::CommandUnrecognized,
             504 => StatusCodeKind::SecurityMechanismNotImplemented,
             550 => StatusCodeKind::RequestActionDenied,
+            553 => StatusCodeKind::FileNameNotAllowed,
             _ => StatusCodeKind::Unknown,
         }
     }
@@ -84,6 +90,10 @@ impl StatusCode {
         let kind = StatusCodeKind::from(code);
 
         Self { kind, code }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.code > 199 && self.code < 399
     }
 
     pub fn is_failure(&self) -> bool {
