@@ -137,6 +137,14 @@ fn test_delete_file() {
     });
 }
 
+#[test]
+fn test_create_directory() {
+    run_with_server(|| {
+        let mut client = Client::connect("localhost", "user", "user")?;
+        client.make_directory("new_dir")
+    });
+}
+
 fn run_with_server<F: Fn() -> Result<(), crate::error::Error>>(func: F) {
     // Reset server data
     std::fs::remove_dir_all("res").unwrap();

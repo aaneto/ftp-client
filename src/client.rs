@@ -334,8 +334,9 @@ impl Client {
         unimplemented!();
     }
 
-    pub fn make_directory(&mut self, _dir_path: &str) -> Result<(), crate::error::Error> {
-        unimplemented!();
+    pub fn make_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting("MKD", dir_path, vec![StatusCodeKind::PathCreated])?;
+        Ok(())
     }
 
     pub fn pwd(&mut self) -> Result<(), crate::error::Error> {

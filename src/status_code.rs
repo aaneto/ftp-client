@@ -28,6 +28,8 @@ pub enum StatusCodeKind {
     EnteredExtendedPassiveMode,
     /// Status code 250
     RequestFileActionCompleted,
+    /// Status code 257
+    PathCreated,
     /// Status code 331
     PasswordRequired,
     /// Status code 350
@@ -60,6 +62,7 @@ impl From<u16> for StatusCodeKind {
             229 => StatusCodeKind::EnteredExtendedPassiveMode,
             230 => StatusCodeKind::UserLoggedIn,
             250 => StatusCodeKind::RequestFileActionCompleted,
+            257 => StatusCodeKind::PathCreated,
             331 => StatusCodeKind::PasswordRequired,
             350 => StatusCodeKind::RequestActionPending,
             500 => StatusCodeKind::CommandUnrecognized,
