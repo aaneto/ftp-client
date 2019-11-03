@@ -1,5 +1,6 @@
 use crate::status_code::{StatusCode, StatusCodeKind};
 use derive_more::From;
+use log::{info, warn};
 use native_tls::{TlsConnector, TlsStream};
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -360,8 +361,13 @@ impl Client {
         Ok(response.message)
     }
 
-    pub fn site_parameters(&mut self) -> Result<(), crate::error::Error> {
-        unimplemented!();
+    pub fn site_parameters(&mut self) -> Result<String, crate::error::Error> {
+        let response = self.write_command_expecting(
+            "SITE",
+            vec![StatusCodeKind::Ok, StatusCodeKind::FeatureNotImplemented],
+        )?;
+
+        Ok(response.message)
     }
 
     pub fn system(&mut self) -> Result<String, crate::error::Error> {
@@ -528,7 +534,16 @@ impl Client {
         valid_statuses: Vec<StatusCodeKind>,
     ) -> Result<ServerResponse, crate::error::Error> {
         let response = self.parse_reply()?;
-        if valid_statuses.contains(&response.status_code.kind) {
+
+        let is_expected_status = valid_statuses.contains(&response.status_code.kind);
+        // We are a bit liberal on what we accept.
+        let is_positive_status = response.status_code.is_valid();
+        warn!(
+            "Unexpected positive status was accepted: {:?}",
+            response.status_code
+        );
+
+        if is_expected_status || is_positive_status {
             Ok(response)
         } else {
             Err(crate::error::Error::UnexpectedStatusCode(

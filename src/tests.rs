@@ -27,6 +27,14 @@ fn pwd() -> Result<(), crate::error::Error> {
 }
 
 #[test]
+fn site() -> Result<(), crate::error::Error> {
+    let mut client = Client::connect("test.rebex.net", "demo", "password")?;
+    client.site_parameters()?;
+
+    Ok(())
+}
+
+#[test]
 fn file_retrieval() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     let readme_file = client.retrieve_file("/readme.txt")?;
