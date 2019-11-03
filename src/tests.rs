@@ -126,6 +126,17 @@ fn test_rename_file() {
     });
 }
 
+#[test]
+fn test_delete_file() {
+    run_with_server(|| {
+        let mut client = Client::connect("localhost", "user", "user")?;
+        client.store("testfile", b"DATA")?;
+        client.delete_file("testfile")?;
+
+        Ok(())
+    });
+}
+
 fn run_with_server<F: Fn() -> Result<(), crate::error::Error>>(func: F) {
     // Reset server data
     std::fs::remove_dir_all("res").unwrap();

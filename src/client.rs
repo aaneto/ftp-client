@@ -353,8 +353,14 @@ impl Client {
         Ok(response.message)
     }
 
-    pub fn delete_file(&mut self, _dir_path: &str) -> Result<(), crate::error::Error> {
-        unimplemented!();
+    pub fn delete_file(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting(
+            "DELE",
+            dir_path,
+            vec![StatusCodeKind::RequestFileActionCompleted],
+        )?;
+
+        Ok(())
     }
 
     pub fn retrieve_file(&mut self, path: &str) -> Result<Vec<u8>, crate::error::Error> {
