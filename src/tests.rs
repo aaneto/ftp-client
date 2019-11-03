@@ -4,7 +4,7 @@
 use crate::prelude::*;
 
 #[test]
-fn test_name_listing() -> Result<(), crate::error::Error> {
+fn name_listing() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
 
     assert_eq!(
@@ -15,7 +15,7 @@ fn test_name_listing() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn test_file_retrieval() -> Result<(), crate::error::Error> {
+fn file_retrieval() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     let readme_file = client.retrieve_file("/readme.txt")?;
     // Taken previously and unlikely to change
@@ -26,7 +26,7 @@ fn test_file_retrieval() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn test_cwd() -> Result<(), crate::error::Error> {
+fn cwd() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.cwd("/pub/example")?;
 
@@ -38,7 +38,7 @@ fn test_cwd() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn test_cdup() -> Result<(), crate::error::Error> {
+fn cdup() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     let initial_names = client.list_names("")?;
     client.cwd("/pub/example")?;
@@ -54,25 +54,25 @@ fn test_cdup() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn test_logout() -> Result<(), crate::error::Error> {
+fn logout() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.logout()
 }
 
 #[test]
-fn test_noop() -> Result<(), crate::error::Error> {
+fn noop() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.noop()
 }
 
 #[test]
-fn test_help() -> Result<(), crate::error::Error> {
+fn help() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.help()
 }
 
 #[test]
-fn test_store() -> Result<(), crate::error::Error> {
+fn store() -> Result<(), crate::error::Error> {
     let mut client = Client::connect(
         "speedtest4.tele2.net",
         "anonymous",
@@ -85,7 +85,7 @@ fn test_store() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn test_system() -> Result<(), crate::error::Error> {
+fn system() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     // Should be Windows_NT but we don't need to check that..
     // since we don't want to break tests if the server changes OS
@@ -95,7 +95,7 @@ fn test_system() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn test_ipv6() -> Result<(), crate::error::Error> {
+fn ipv6() -> Result<(), crate::error::Error> {
     let mut client = Client::connect(
         "speedtest6.tele2.net",
         "anonymous",
@@ -108,7 +108,7 @@ fn test_ipv6() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn test_tls() -> Result<(), crate::error::Error> {
+fn tls() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     // Run random command just to assert we are communicating
     let _system_name = client.system()?;
@@ -116,7 +116,7 @@ fn test_tls() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn test_rename_file() {
+fn rename_file() {
     run_with_server(|| {
         let mut client = Client::connect("localhost", "user", "user")?;
         client.store("testfile", b"DATA")?;
@@ -127,7 +127,7 @@ fn test_rename_file() {
 }
 
 #[test]
-fn test_delete_file() {
+fn delete_file() {
     run_with_server(|| {
         let mut client = Client::connect("localhost", "user", "user")?;
         client.store("testfile", b"DATA")?;
@@ -138,7 +138,7 @@ fn test_delete_file() {
 }
 
 #[test]
-fn test_create_directory() {
+fn create_directory() {
     run_with_server(|| {
         let mut client = Client::connect("localhost", "user", "user")?;
         client.make_directory("new_dir")
@@ -146,7 +146,7 @@ fn test_create_directory() {
 }
 
 #[test]
-fn test_delete_directory() {
+fn delete_directory() {
     run_with_server(|| {
         let mut client = Client::connect("localhost", "user", "user")?;
         client.make_directory("new_dir")?;
