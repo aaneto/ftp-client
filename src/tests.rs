@@ -17,6 +17,16 @@ fn name_listing() -> Result<(), crate::error::Error> {
 }
 
 #[test]
+fn pwd() -> Result<(), crate::error::Error> {
+    let mut client = Client::connect("test.rebex.net", "demo", "password")?;
+    client.cwd("/pub")?;
+    let dir = client.pwd()?;
+    assert!(dir.contains("/pub"));
+
+    Ok(())
+}
+
+#[test]
 fn file_retrieval() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     let readme_file = client.retrieve_file("/readme.txt")?;

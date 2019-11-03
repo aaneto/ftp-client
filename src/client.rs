@@ -355,8 +355,10 @@ impl Client {
         Ok(())
     }
 
-    pub fn pwd(&mut self) -> Result<(), crate::error::Error> {
-        unimplemented!();
+    pub fn pwd(&mut self) -> Result<String, crate::error::Error> {
+        let mut conn = self.get_data_connection()?;
+        let response = self.write_command_expecting("PWD", vec![StatusCodeKind::PathCreated])?;
+        Ok(response.message)
     }
 
     pub fn site_parameters(&mut self) -> Result<(), crate::error::Error> {
