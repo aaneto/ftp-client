@@ -87,6 +87,20 @@ fn store() -> Result<(), crate::error::Error> {
 }
 
 #[test]
+fn store_unique() -> Result<(), crate::error::Error> {
+    let mut client = Client::connect(
+        "speedtest4.tele2.net",
+        "anonymous",
+        "anonymous@anonymous.com",
+    )?;
+    client.cwd("/upload/")?;
+    let file_data = b"Some data for you";
+    client.store_unique(file_data)?;
+
+    Ok(())
+}
+
+#[test]
 fn system() -> Result<(), crate::error::Error> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     // Should be Windows_NT but we don't need to check that..

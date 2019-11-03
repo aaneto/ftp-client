@@ -279,12 +279,23 @@ impl Client {
         Ok(())
     }
 
-    pub fn store_unique<B: AsRef<[u8]>>(
-        &mut self,
-        _path: &str,
-        _data: B,
-    ) -> Result<(), crate::error::Error> {
-        unimplemented!();
+    pub fn store_unique<B: AsRef<[u8]>>(&mut self, data: B) -> Result<String, crate::error::Error> {
+        // Scope connection so it drops before reading server reply.
+        {
+            let mut conn = self.get_data_connection()?;
+            self.write_command_expecting(
+                "STOU",
+                vec![
+                    StatusCodeKind::TransferStarted,
+                    StatusCodeKind::TransferAboutToStart,
+                ],
+            )?;
+            conn.get_mut().write(&mut data.as_ref())?;
+        }
+
+        let reply = self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+
+        Ok(reply.message)
     }
 
     pub fn append<B: AsRef<[u8]>>(
