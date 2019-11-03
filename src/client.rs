@@ -356,7 +356,6 @@ impl Client {
     }
 
     pub fn pwd(&mut self) -> Result<String, crate::error::Error> {
-        let mut conn = self.get_data_connection()?;
         let response = self.write_command_expecting("PWD", vec![StatusCodeKind::PathCreated])?;
         Ok(response.message)
     }
