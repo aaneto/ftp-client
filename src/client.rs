@@ -330,8 +330,13 @@ impl Client {
         Ok(())
     }
 
-    pub fn remove_directory(&mut self, _dir_path: &str) -> Result<(), crate::error::Error> {
-        unimplemented!();
+    pub fn remove_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting(
+            "RMD",
+            dir_path,
+            vec![StatusCodeKind::RequestFileActionCompleted],
+        )?;
+        Ok(())
     }
 
     pub fn make_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
