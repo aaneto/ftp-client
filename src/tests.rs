@@ -2,6 +2,8 @@
 //! are made with real sample FTP servers.
 
 use crate::prelude::*;
+use once_cell::sync::OnceCell;
+use std::sync::Mutex;
 
 #[test]
 fn name_listing() -> Result<(), crate::error::Error> {
@@ -154,13 +156,19 @@ fn delete_directory() {
     });
 }
 
+static SERVER_MUTEX: OnceCell<Mutex<()>> = OnceCell::new();
+
 fn run_with_server<F: Fn() -> Result<(), crate::error::Error>>(func: F) {
+    let mutex = SERVER_MUTEX.get_or_init(|| Mutex::new(()));
+    let _guard = mutex.lock().unwrap();
     // Reset server data
     std::fs::remove_dir_all("res").unwrap();
     std::fs::create_dir("res").unwrap();
 
     let mut child = std::process::Command::new("python")
         .arg("src/sample_server.py")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn()
         .unwrap();
     let result = func();
