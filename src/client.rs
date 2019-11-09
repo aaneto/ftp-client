@@ -301,10 +301,29 @@ impl Client {
 
     pub fn append<B: AsRef<[u8]>>(
         &mut self,
-        _path: &str,
-        _data: B,
+        path: &str,
+        data: B,
     ) -> Result<(), crate::error::Error> {
-        unimplemented!();
+        // Scope connection so it drops before reading server reply.
+        {
+            let mut conn = self.get_data_connection()?;
+            self.write_unary_command_expecting(
+                "APPE",
+                path,
+                vec![
+                    StatusCodeKind::TransferStarted,
+                    StatusCodeKind::TransferAboutToStart,
+                ],
+            )?;
+            conn.get_mut().write(&mut data.as_ref())?;
+        }
+
+        self.parse_reply_expecting(vec![
+            StatusCodeKind::RequestActionCompleted,
+            StatusCodeKind::RequestFileActionCompleted,
+        ])?;
+
+        Ok(())
     }
 
     pub fn restart(&mut self) -> Result<(), crate::error::Error> {

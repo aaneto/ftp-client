@@ -105,6 +105,18 @@ fn store() -> Result<(), crate::error::Error> {
 }
 
 #[test]
+fn append() {
+    run_with_server(|| {
+        let mut client = Client::connect("localhost", "user", "user")?;
+        let file_data = b"Some data for you";
+        let file_name = "/readyou.txt";
+        client.append(file_name, file_data)?;
+
+        Ok(())
+    });
+}
+
+#[test]
 fn store_unique() -> Result<(), crate::error::Error> {
     let mut client = Client::connect(
         "speedtest4.tele2.net",
