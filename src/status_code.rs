@@ -1,3 +1,8 @@
+//! Contains code for using and parsing FTP status codes.
+
+/// Represent a textual interpretation
+/// of a particular status code, most were
+/// taken from RFC 959.
 #[derive(Debug, PartialEq)]
 pub enum StatusCodeKind {
     /// Status code 125
@@ -42,6 +47,8 @@ pub enum StatusCodeKind {
     RequestActionDenied,
     /// Status code 553
     FileNameNotAllowed,
+    /// Status code not expected by any implementation
+    /// on this crate.
     Unknown,
 }
 
@@ -74,9 +81,14 @@ impl From<u16> for StatusCodeKind {
     }
 }
 
+/// Contains a [StatusCodeKind](enum.StatusCodeKind.html) and
+/// the corresponding code for it, this is useful on generating
+/// error messages and validity of a particular code.
 #[derive(Debug)]
 pub struct StatusCode {
+    /// The [StatusCodeKind](enum.StatusCodeKind.html)
     pub kind: StatusCodeKind,
+    /// The integer representing the status code
     pub code: u16,
 }
 
@@ -87,6 +99,7 @@ impl PartialEq for StatusCode {
 }
 
 impl StatusCode {
+    /// Parse a server response into a [StatusCode](struct.StatusCode.html) struct.
     pub fn parse(text: &str) -> Self {
         let code: &u16 = &text[0..3].parse().unwrap();
         let code: u16 = *code;
@@ -95,10 +108,12 @@ impl StatusCode {
         Self { kind, code }
     }
 
+    /// Returns whether a status code number is valid.
     pub fn is_valid(&self) -> bool {
         self.code > 199 && self.code < 399
     }
 
+    /// Returns whether a status code number is a failure.
     pub fn is_failure(&self) -> bool {
         self.code > 399 && self.code < 599
     }
