@@ -1,0 +1,76 @@
+name: Tests
+
+on:
+  push:
+    branches: master
+
+jobs:
+  windows-test:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: hecrj/setup-rust-action@master
+      with:
+        rust-version: stable
+    
+    - name: Build project
+      run: cargo build --verbose
+    
+    - name: Test project
+      run: cargo test --verbose
+  
+  macos-test:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: hecrj/setup-rust-action@master
+      with:
+        rust-version: stable
+    
+    - name: Build project
+      run: cargo build --verbose
+    
+    - name: Test project
+      run: cargo test --verbose
+  
+  linux-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: hecrj/setup-rust-action@master
+      with:
+        rust-version: stable
+    
+    - name: Build project
+      run: cargo build --verbose
+    
+    - name: Test project
+      run: cargo test --verbose
+  
+  nigthly-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: hecrj/setup-rust-action@master
+      with:
+        rust-version: nightly
+    
+    - name: Build project
+      run: cargo build --verbose
+    
+    - name: Test project
+      run: cargo test --verbose
+  
+  legacy-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: hecrj/setup-rust-action@master
+      with:
+        rust-version: 1.34.0
+  
+    - name: Build project
+      run: cargo build --verbose
+    
+    - name: Test project
+      run: cargo test --verbose

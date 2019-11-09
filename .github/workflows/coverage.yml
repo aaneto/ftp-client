@@ -1,0 +1,26 @@
+name: Coverage
+
+on:
+  create:
+    tags:
+
+jobs:
+  upload-coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - uses: hecrj/setup-rust-action@master
+      with:
+        rust-version: stable
+
+    - name: Install coverage tool
+      run: cargo install cargo-tarpaulin --force
+
+    - name: Build project
+      run: cargo build --verbose
+    
+    - name: Run tests
+      env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      run: cargo tarpaulin --out Xml && bash <(curl -s https://codecov.io/bash)
