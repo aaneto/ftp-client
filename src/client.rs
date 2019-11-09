@@ -1,6 +1,6 @@
 use crate::status_code::{StatusCode, StatusCodeKind};
 use derive_more::From;
-use log::{info, warn};
+use log::warn;
 use native_tls::{TlsConnector, TlsStream};
 use std::io::prelude::*;
 use std::io::BufReader;
