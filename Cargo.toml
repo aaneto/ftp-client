@@ -3,6 +3,13 @@ name = "ftp-client"
 version = "0.1.0"
 authors = ["Adilson Neto <almeidneto@gmail.com>"]
 edition = "2018"
+readme = "README.md"
+
+keywords = [ "ftp" ]
+categories = [ "network-programming" ]
+description = "A FTP client library"
+repository = "https://github.com/aaneto/ftp-client"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
