@@ -1,12 +1,12 @@
 //! Tests for the FTP client crate, all the tests
 //! are made with real sample FTP servers.
-
-use crate::prelude::*;
+use ftp_client::error::Error as FtpError;
+use ftp_client::prelude::*;
 use once_cell::sync::OnceCell;
 use std::sync::Mutex;
 
 #[test]
-fn name_listing() -> Result<(), crate::error::Error> {
+fn name_listing() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
 
     assert_eq!(
@@ -17,7 +17,7 @@ fn name_listing() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn pwd() -> Result<(), crate::error::Error> {
+fn pwd() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.cwd("/pub")?;
     let dir = client.pwd()?;
@@ -27,7 +27,7 @@ fn pwd() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn site() -> Result<(), crate::error::Error> {
+fn site() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.site_parameters()?;
 
@@ -35,7 +35,7 @@ fn site() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn file_retrieval() -> Result<(), crate::error::Error> {
+fn file_retrieval() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     let readme_file = client.retrieve_file("/readme.txt")?;
     // Taken previously and unlikely to change
@@ -46,7 +46,7 @@ fn file_retrieval() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn cwd() -> Result<(), crate::error::Error> {
+fn cwd() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.cwd("/pub/example")?;
 
@@ -58,7 +58,7 @@ fn cwd() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn cdup() -> Result<(), crate::error::Error> {
+fn cdup() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     let initial_names = client.list_names("")?;
     client.cwd("/pub/example")?;
@@ -74,25 +74,25 @@ fn cdup() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn logout() -> Result<(), crate::error::Error> {
+fn logout() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.logout()
 }
 
 #[test]
-fn noop() -> Result<(), crate::error::Error> {
+fn noop() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.noop()
 }
 
 #[test]
-fn help() -> Result<(), crate::error::Error> {
+fn help() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.help()
 }
 
 #[test]
-fn store() -> Result<(), crate::error::Error> {
+fn store() -> Result<(), FtpError> {
     let mut client = Client::connect(
         "speedtest4.tele2.net",
         "anonymous",
@@ -117,7 +117,7 @@ fn append() {
 }
 
 #[test]
-fn store_unique() -> Result<(), crate::error::Error> {
+fn store_unique() -> Result<(), FtpError> {
     let mut client = Client::connect(
         "speedtest4.tele2.net",
         "anonymous",
@@ -131,7 +131,7 @@ fn store_unique() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn system() -> Result<(), crate::error::Error> {
+fn system() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     // Should be Windows_NT but we don't need to check that..
     // since we don't want to break tests if the server changes OS
@@ -141,7 +141,7 @@ fn system() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn ipv6() -> Result<(), crate::error::Error> {
+fn ipv6() -> Result<(), FtpError> {
     let mut client = Client::connect(
         "speedtest6.tele2.net",
         "anonymous",
@@ -154,7 +154,7 @@ fn ipv6() -> Result<(), crate::error::Error> {
 }
 
 #[test]
-fn tls() -> Result<(), crate::error::Error> {
+fn tls() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     // Run random command just to assert we are communicating
     let _system_name = client.system()?;
@@ -202,7 +202,7 @@ fn delete_directory() {
 
 static SERVER_MUTEX: OnceCell<Mutex<()>> = OnceCell::new();
 
-fn run_with_server<F: Fn() -> Result<(), crate::error::Error>>(func: F) {
+fn run_with_server<F: Fn() -> Result<(), FtpError>>(func: F) {
     let mutex = SERVER_MUTEX.get_or_init(|| Mutex::new(()));
     let _guard = mutex.lock().unwrap();
     // Reset server data
