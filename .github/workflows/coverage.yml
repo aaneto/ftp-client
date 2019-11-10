@@ -1,8 +1,8 @@
 name: Coverage
 
 on:
-  create:
-    tags:
+  push:
+    branches: master
 
 jobs:
   upload-coverage:
