@@ -332,7 +332,7 @@ impl Client {
                     StatusCodeKind::TransferAboutToStart,
                 ],
             )?;
-            conn.get_mut().write(&mut data.as_ref())?;
+            conn.get_mut().write_all(data.as_ref())?;
         }
 
         self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
@@ -352,7 +352,7 @@ impl Client {
                     StatusCodeKind::TransferAboutToStart,
                 ],
             )?;
-            conn.get_mut().write(&mut data.as_ref())?;
+            conn.get_mut().write_all(data.as_ref())?;
         }
 
         let reply = self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
@@ -377,7 +377,7 @@ impl Client {
                     StatusCodeKind::TransferAboutToStart,
                 ],
             )?;
-            conn.get_mut().write(&mut data.as_ref())?;
+            conn.get_mut().write_all(data.as_ref())?;
         }
 
         self.parse_reply_expecting(vec![
@@ -548,7 +548,7 @@ impl Client {
     /// Write a command with one argument to the server.
     pub fn write_unary_command(&mut self, cmd: &str, arg: &str) -> Result<(), crate::error::Error> {
         let text = format!("{} {}\r\n", cmd, arg);
-        self.stream.get_mut().write(text.as_bytes())?;
+        self.stream.get_mut().write_all(text.as_bytes())?;
 
         Ok(())
     }
@@ -566,7 +566,7 @@ impl Client {
     /// Write a command to the server.
     pub fn write_command(&mut self, cmd: &str) -> Result<(), crate::error::Error> {
         let text = format!("{}\r\n", cmd);
-        self.stream.get_mut().write(text.as_bytes())?;
+        self.stream.get_mut().write_all(text.as_bytes())?;
 
         Ok(())
     }
