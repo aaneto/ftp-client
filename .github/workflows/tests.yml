@@ -24,7 +24,7 @@ jobs:
     - name: Test project
       run: cargo test external --verbose
       env:
-        SERVER_HOSTNAME: ftp_server
+        SERVER_HOSTNAME: ftp
   
   macos-test:
     runs-on: macos-latest
@@ -78,12 +78,12 @@ jobs:
     - name: Test project
       run: cargo test --verbose
       env:
-        SERVER_HOSTNAME: ftp_server
+        SERVER_HOSTNAME: ftp
   
   nigthly-test:
     runs-on: ubuntu-latest
     services:
-      ftp_server:
+      ftp:
         image: adilsinho/ftp-server
         ports:
         - 20:20
@@ -109,7 +109,7 @@ jobs:
     - name: Test project
       run: cargo test --verbose
       env:
-        SERVER_HOSTNAME: ftp_server
+        SERVER_HOSTNAME: ftp
   
   legacy-test:
     runs-on: ubuntu-latest
@@ -140,4 +140,4 @@ jobs:
     - name: Test project
       run: cargo test --verbose
       env:
-        SERVER_HOSTNAME: ftp_server
+        SERVER_HOSTNAME: ftp
