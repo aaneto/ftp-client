@@ -29,5 +29,6 @@ pub mod status_code;
 /// The prelude module contains some useful default imports.
 pub mod prelude {
     pub use crate::client::Client;
+    pub use crate::client::ClientMode;
     pub use crate::status_code::{StatusCode, StatusCodeKind};
 }

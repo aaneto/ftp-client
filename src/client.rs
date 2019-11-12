@@ -128,6 +128,11 @@ pub struct Client {
 }
 
 impl Client {
+    /// Set the mode for the client.
+    pub fn set_mode(&mut self, mode: ClientMode) {
+        self.mode = mode
+    }
+
     /// Connect to a new FTP server using plain text (no TLS).
     pub fn connect(
         hostname: &str,
