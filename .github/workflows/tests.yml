@@ -5,6 +5,15 @@ on: push
 jobs:
   windows-test:
     runs-on: windows-latest
+    services:
+      ftp_server:
+        image: adilsinho/ftp-server
+        ports:
+        - 20:20
+        - 21:21
+        - 2558:2558
+        - 2559:2559
+        
     steps:
     - uses: actions/checkout@v1
     - uses: hecrj/setup-rust-action@master
@@ -22,9 +31,20 @@ jobs:
     
     - name: Test project
       run: cargo test --verbose
+      env:
+        SERVER_HOSTNAME: ftp_server
   
   macos-test:
     runs-on: macos-latest
+    services:
+      ftp_server:
+        image: adilsinho/ftp-server
+        ports:
+        - 20:20
+        - 21:21
+        - 2558:2558
+        - 2559:2559
+
     steps:
     - uses: actions/checkout@v1
     - uses: hecrj/setup-rust-action@master
@@ -42,9 +62,20 @@ jobs:
     
     - name: Test project
       run: cargo test --verbose
+      env:
+        SERVER_HOSTNAME: ftp_server
   
   linux-test:
     runs-on: ubuntu-latest
+    services:
+      ftp_server:
+        image: adilsinho/ftp-server
+        ports:
+        - 20:20
+        - 21:21
+        - 2558:2558
+        - 2559:2559
+
     steps:
     - uses: actions/checkout@v1
     - uses: hecrj/setup-rust-action@master
@@ -62,9 +93,20 @@ jobs:
     
     - name: Test project
       run: cargo test --verbose
+      env:
+        SERVER_HOSTNAME: ftp_server
   
   nigthly-test:
     runs-on: ubuntu-latest
+    services:
+      ftp_server:
+        image: adilsinho/ftp-server
+        ports:
+        - 20:20
+        - 21:21
+        - 2558:2558
+        - 2559:2559
+
     steps:
     - uses: actions/checkout@v1
     - uses: hecrj/setup-rust-action@master
@@ -82,9 +124,20 @@ jobs:
     
     - name: Test project
       run: cargo test --verbose
+      env:
+        SERVER_HOSTNAME: ftp_server
   
   legacy-test:
     runs-on: ubuntu-latest
+    services:
+      ftp_server:
+        image: adilsinho/ftp-server
+        ports:
+        - 20:20
+        - 21:21
+        - 2558:2558
+        - 2559:2559
+        
     steps:
     - uses: actions/checkout@v1
     - uses: hecrj/setup-rust-action@master
@@ -102,3 +155,5 @@ jobs:
     
     - name: Test project
       run: cargo test --verbose
+      env:
+        SERVER_HOSTNAME: ftp_server
