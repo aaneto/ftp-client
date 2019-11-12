@@ -219,4 +219,5 @@ static SERVER_MUTEX: OnceCell<Mutex<()>> = OnceCell::new();
 fn lock_server() {
     let mutex = SERVER_MUTEX.get_or_init(|| Mutex::new(()));
     let _guard = mutex.lock().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(500));
 }
