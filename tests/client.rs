@@ -207,8 +207,6 @@ fn delete_directory() {
 }
 
 static SERVER_MUTEX: OnceCell<Mutex<()>> = OnceCell::new();
-#[ignore]
-
 fn run_with_server<F: Fn() -> Result<(), FtpError>>(func: F) {
     let mutex = SERVER_MUTEX.get_or_init(|| Mutex::new(()));
     let _guard = mutex.lock().unwrap();
