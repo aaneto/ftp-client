@@ -3,7 +3,7 @@
 ![quality gate](https://github.com/aaneto/celtic-names/workflows/Quality%20Gate/badge.svg)
 ![tests](https://github.com/aaneto/celtic-names/workflows/Tests/badge.svg)
 
-
+[![codecov](https://codecov.io/gh/aaneto/ftp-client/branch/master/graph/badge.svg)](https://codecov.io/gh/aaneto/ftp-client)
 [![Documentation](https://docs.rs/ftp-client/badge.svg)](https://docs.rs/ftp-client)
 [![crates.io](https://img.shields.io/crates/v/ftp-client.svg)](https://crates.io/crates/ftp-client)
 
