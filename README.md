@@ -27,6 +27,18 @@ fn main() -> Result<(), ftp_client::error::Error> {
 
 # Running tests
 
-To run all tests, python3 is needed with the dependency pyftpdlib installed.
+To run all tests a few dependencies are needed, you need to run the docker image contained in "sample-server", like below:
 
-This is needed because a python3 ftp server is needed for some tests.
+### Building the image
+```bash
+cd sample-server
+docker build . -t ftp-server
+```
+
+### Running the image on the background
+
+```bash
+docker run -d -p 20:20 -p 21:21 -p 2558:2558 -p 2559:2559 ftp-server
+```
+
+After that, you can run ```cargo test``` as you normally would.
