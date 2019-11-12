@@ -1,12 +1,16 @@
 //! Tests for the FTP client crate, all the tests
 //! are made with real sample FTP servers.
+//!
+//! Tests that start with external_ are run with
+//! external FTP servers, the others are run
+//! with a local dockerize server that you should start.
 use ftp_client::error::Error as FtpError;
 use ftp_client::prelude::*;
 use once_cell::sync::OnceCell;
 use std::sync::Mutex;
 
 #[test]
-fn name_listing() -> Result<(), FtpError> {
+fn external_name_listing() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
 
     assert_eq!(
@@ -17,7 +21,7 @@ fn name_listing() -> Result<(), FtpError> {
 }
 
 #[test]
-fn pwd() -> Result<(), FtpError> {
+fn external_pwd() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.cwd("/pub")?;
     let dir = client.pwd()?;
@@ -27,7 +31,7 @@ fn pwd() -> Result<(), FtpError> {
 }
 
 #[test]
-fn site() -> Result<(), FtpError> {
+fn external_site() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.site_parameters()?;
 
@@ -35,7 +39,7 @@ fn site() -> Result<(), FtpError> {
 }
 
 #[test]
-fn file_retrieval() -> Result<(), FtpError> {
+fn external_file_retrieval() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     let readme_file = client.retrieve_file("/readme.txt")?;
     // Taken previously and unlikely to change
@@ -46,7 +50,7 @@ fn file_retrieval() -> Result<(), FtpError> {
 }
 
 #[test]
-fn cwd() -> Result<(), FtpError> {
+fn external_cwd() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.cwd("/pub/example")?;
 
@@ -58,7 +62,7 @@ fn cwd() -> Result<(), FtpError> {
 }
 
 #[test]
-fn cdup() -> Result<(), FtpError> {
+fn external_cdup() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     let initial_names = client.list_names("")?;
     client.cwd("/pub/example")?;
@@ -74,25 +78,25 @@ fn cdup() -> Result<(), FtpError> {
 }
 
 #[test]
-fn logout() -> Result<(), FtpError> {
+fn external_logout() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.logout()
 }
 
 #[test]
-fn noop() -> Result<(), FtpError> {
+fn external_noop() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.noop()
 }
 
 #[test]
-fn help() -> Result<(), FtpError> {
+fn external_help() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     client.help()
 }
 
 #[test]
-fn store() -> Result<(), FtpError> {
+fn external_store() -> Result<(), FtpError> {
     let mut client = Client::connect(
         "speedtest4.tele2.net",
         "anonymous",
@@ -105,18 +109,7 @@ fn store() -> Result<(), FtpError> {
 }
 
 #[test]
-fn append() -> Result<(), FtpError> {
-    lock_server();
-    let mut client = Client::connect("127.0.0.1", "user", "user")?;
-    let file_data = b"Some data for you";
-    let file_name = "readyou.txt";
-    client.append(file_name, file_data)?;
-
-    Ok(())
-}
-
-#[test]
-fn store_unique() -> Result<(), FtpError> {
+fn external_store_unique() -> Result<(), FtpError> {
     let mut client = Client::connect(
         "speedtest4.tele2.net",
         "anonymous",
@@ -130,7 +123,7 @@ fn store_unique() -> Result<(), FtpError> {
 }
 
 #[test]
-fn system() -> Result<(), FtpError> {
+fn external_system() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     // Should be Windows_NT but we don't need to check that..
     // since we don't want to break tests if the server changes OS
@@ -141,7 +134,7 @@ fn system() -> Result<(), FtpError> {
 
 #[test]
 #[ignore]
-fn ipv6() -> Result<(), FtpError> {
+fn external_ipv6() -> Result<(), FtpError> {
     let mut client = Client::connect(
         "speedtest6.tele2.net",
         "anonymous",
@@ -154,10 +147,21 @@ fn ipv6() -> Result<(), FtpError> {
 }
 
 #[test]
-fn tls() -> Result<(), FtpError> {
+fn external_tls() -> Result<(), FtpError> {
     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
     // Run random command just to assert we are communicating
     let _system_name = client.system()?;
+    Ok(())
+}
+
+#[test]
+fn append() -> Result<(), FtpError> {
+    lock_server();
+    let mut client = Client::connect(&get_local_server_hostname(), "user", "user")?;
+    let file_data = b"Some data for you";
+    let file_name = "readyou.txt";
+    client.append(file_name, file_data)?;
+
     Ok(())
 }
 
