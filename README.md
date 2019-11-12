@@ -1,4 +1,8 @@
 # ftp-client
+![coverage status](https://github.com/aaneto/celtic-names/workflows/Coverage/badge.svg)
+![quality gate](https://github.com/aaneto/celtic-names/workflows/Quality%20Gate/badge.svg)
+![tests](https://github.com/aaneto/celtic-names/workflows/Tests/badge.svg)
+
 
 [![Documentation](https://docs.rs/ftp-client/badge.svg)](https://docs.rs/ftp-client)
 [![crates.io](https://img.shields.io/crates/v/ftp-client.svg)](https://crates.io/crates/ftp-client)
