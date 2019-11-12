@@ -23,8 +23,6 @@ jobs:
     
     - name: Test project
       run: cargo test external --verbose
-      env:
-        SERVER_HOSTNAME: ftp
   
   macos-test:
     runs-on: macos-latest
@@ -46,8 +44,6 @@ jobs:
     
     - name: Test project
       run: cargo test external --verbose
-      env:
-        SERVER_HOSTNAME: ftp_server
   
   linux-test:
     runs-on: ubuntu-latest
