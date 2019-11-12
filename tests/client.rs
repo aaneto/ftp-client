@@ -105,16 +105,14 @@ fn store() -> Result<(), FtpError> {
 }
 
 #[test]
-#[ignore]
-fn append() {
-    run_with_server(|| {
-        let mut client = Client::connect("localhost", "user", "user")?;
-        let file_data = b"Some data for you";
-        let file_name = "/readyou.txt";
-        client.append(file_name, file_data)?;
+fn append() -> Result<(), FtpError> {
+    lock_server();
+    let mut client = Client::connect("127.0.0.1", "user", "user")?;
+    let file_data = b"Some data for you";
+    let file_name = "readyou.txt";
+    client.append(file_name, file_data)?;
 
-        Ok(())
-    });
+    Ok(())
 }
 
 #[test]
@@ -164,64 +162,57 @@ fn tls() -> Result<(), FtpError> {
 }
 
 #[test]
-#[ignore]
-fn rename_file() {
-    run_with_server(|| {
-        let mut client = Client::connect("localhost", "user", "user")?;
+fn rename_file() -> Result<(), FtpError> {
+    lock_server();
+    let mut client = Client::connect(&get_local_server_hostname(), "user", "user")?;
+    if !client.list_names("/")?.contains(&"testfile".to_string()) {
         client.store("testfile", b"DATA")?;
-        client.rename_file("testfile", "testfile.txt")?;
+    }
+    client.rename_file("testfile", "testfile.txt")?;
 
-        Ok(())
-    });
+    Ok(())
 }
 
 #[test]
-#[ignore]
-fn delete_file() {
-    run_with_server(|| {
-        let mut client = Client::connect("localhost", "user", "user")?;
+fn delete_file() -> Result<(), FtpError> {
+    lock_server();
+    let mut client = Client::connect(&get_local_server_hostname(), "user", "user")?;
+    if !client.list_names("/")?.contains(&"testfile".to_string()) {
         client.store("testfile", b"DATA")?;
-        client.delete_file("testfile")?;
+    }
+    client.delete_file("testfile")?;
 
-        Ok(())
-    });
+    Ok(())
 }
 
 #[test]
-#[ignore]
-fn create_directory() {
-    run_with_server(|| {
-        let mut client = Client::connect("localhost", "user", "user")?;
-        client.make_directory("new_dir")
-    });
+fn create_directory() -> Result<(), FtpError> {
+    lock_server();
+    let mut client = Client::connect_with_port(&get_local_server_hostname(), 21, "user", "user")?;
+    if client.list_names("/")?.contains(&"new_dir".to_string()) {
+        client.remove_directory("new_dir")?;
+    }
+    client.make_directory("new_dir")
 }
 
 #[test]
-#[ignore]
-fn delete_directory() {
-    run_with_server(|| {
-        let mut client = Client::connect("localhost", "user", "user")?;
+fn delete_directory() -> Result<(), FtpError> {
+    lock_server();
+    let mut client = Client::connect(&get_local_server_hostname(), "user", "user")?;
+    if !client.list_names("/")?.contains(&"new_dir".to_string()) {
         client.make_directory("new_dir")?;
-        client.remove_directory("new_dir")
-    });
+    }
+    client.remove_directory("new_dir")
+}
+
+/// Get the hostname for the local server.
+fn get_local_server_hostname() -> String {
+    std::env::var("SERVER_HOSTNAME").unwrap()
 }
 
 static SERVER_MUTEX: OnceCell<Mutex<()>> = OnceCell::new();
-fn run_with_server<F: Fn() -> Result<(), FtpError>>(func: F) {
+/// Tests using the local server can not run concurrently.
+fn lock_server() {
     let mutex = SERVER_MUTEX.get_or_init(|| Mutex::new(()));
     let _guard = mutex.lock().unwrap();
-    // Reset server data
-    std::fs::remove_dir_all("res").unwrap();
-    std::fs::create_dir("res").unwrap();
-
-    let mut child = std::process::Command::new("python")
-        .arg("src/sample_server.py")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .unwrap();
-    let result = func();
-    // Clean up before running unwrap on test result
-    child.kill().unwrap();
-    result.unwrap();
 }

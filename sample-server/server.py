@@ -8,6 +8,7 @@ authorizer.add_anonymous("res")
 
 handler = FTPHandler
 handler.authorizer = authorizer
+handler.passive_ports = range(2558, 2560)
 
-server = FTPServer(("127.0.0.1", 21), handler)
+server = FTPServer(("0.0.0.0", 21), handler)
 server.serve_forever()
