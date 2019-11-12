@@ -7,18 +7,20 @@ on:
 jobs:
   upload-coverage:
     runs-on: ubuntu-latest
+    services:
+      ftp_server:
+        image: adilsinho/ftp-server
+        ports:
+        - 20:20
+        - 21:21
+        - 2558:2558
+        - 2559:2559
 
     steps:
     - uses: actions/checkout@v1
     - uses: hecrj/setup-rust-action@master
       with:
         rust-version: stable
-    - uses: actions/setup-python@v1
-      with:
-        python-version: 3.7
-    
-    - name: Setup python dependencies
-      run: python -m pip install pyftpdlib
 
     - name: Install coverage tool
       run: cargo install cargo-tarpaulin --force
@@ -29,4 +31,5 @@ jobs:
     - name: Run tests
       env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          SERVER_HOSTNAME: localhost
       run: cargo tarpaulin --out Xml && bash <(curl -s https://codecov.io/bash)
