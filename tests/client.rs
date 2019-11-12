@@ -105,6 +105,7 @@ fn store() -> Result<(), FtpError> {
 }
 
 #[test]
+#[ignore]
 fn append() {
     run_with_server(|| {
         let mut client = Client::connect("localhost", "user", "user")?;
@@ -141,6 +142,7 @@ fn system() -> Result<(), FtpError> {
 }
 
 #[test]
+#[ignore]
 fn ipv6() -> Result<(), FtpError> {
     let mut client = Client::connect(
         "speedtest6.tele2.net",
@@ -162,6 +164,7 @@ fn tls() -> Result<(), FtpError> {
 }
 
 #[test]
+#[ignore]
 fn rename_file() {
     run_with_server(|| {
         let mut client = Client::connect("localhost", "user", "user")?;
@@ -173,6 +176,7 @@ fn rename_file() {
 }
 
 #[test]
+#[ignore]
 fn delete_file() {
     run_with_server(|| {
         let mut client = Client::connect("localhost", "user", "user")?;
@@ -184,6 +188,7 @@ fn delete_file() {
 }
 
 #[test]
+#[ignore]
 fn create_directory() {
     run_with_server(|| {
         let mut client = Client::connect("localhost", "user", "user")?;
@@ -192,6 +197,7 @@ fn create_directory() {
 }
 
 #[test]
+#[ignore]
 fn delete_directory() {
     run_with_server(|| {
         let mut client = Client::connect("localhost", "user", "user")?;
@@ -201,6 +207,7 @@ fn delete_directory() {
 }
 
 static SERVER_MUTEX: OnceCell<Mutex<()>> = OnceCell::new();
+#[ignore]
 
 fn run_with_server<F: Fn() -> Result<(), FtpError>>(func: F) {
     let mutex = SERVER_MUTEX.get_or_init(|| Mutex::new(()));
