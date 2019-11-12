@@ -141,6 +141,7 @@ fn system() -> Result<(), FtpError> {
 }
 
 #[test]
+#[ignore]
 fn ipv6() -> Result<(), FtpError> {
     let mut client = Client::connect(
         "speedtest6.tele2.net",
