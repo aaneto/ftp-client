@@ -1,7 +1,7 @@
 # ftp-client
-![coverage status](https://github.com/aaneto/celtic-names/workflows/Coverage/badge.svg)
-![quality gate](https://github.com/aaneto/celtic-names/workflows/Quality%20Gate/badge.svg)
-![tests](https://github.com/aaneto/celtic-names/workflows/Tests/badge.svg)
+![coverage status](https://github.com/aaneto/ftp-client/workflows/Coverage/badge.svg)
+![quality gate](https://github.com/aaneto/ftp-client/workflows/Quality%20Gate/badge.svg)
+![tests](https://github.com/aaneto/ftp-client/workflows/Tests/badge.svg)
 
 [![codecov](https://codecov.io/gh/aaneto/ftp-client/branch/master/graph/badge.svg)](https://codecov.io/gh/aaneto/ftp-client)
 [![Documentation](https://docs.rs/ftp-client/badge.svg)](https://docs.rs/ftp-client)
