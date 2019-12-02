@@ -264,6 +264,18 @@ impl Client {
         Ok(())
     }
 
+    /// Set the transfer type to ascii
+    pub fn ascii(&mut self) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting("TYPE", "A", vec![StatusCodeKind::Ok])?;
+        Ok(())
+    }
+
+    /// Set the transfer type to binary
+    pub fn binary(&mut self) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting("TYPE", "I", vec![StatusCodeKind::Ok])?;
+        Ok(())
+    }
+
     /// Get the current reported status from the server. This can be used
     /// during transfer and between them. This command can be used with
     /// and argument to get behaviour similar to LIST, this particular
