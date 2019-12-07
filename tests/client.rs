@@ -209,6 +209,24 @@ fn delete_directory() -> Result<(), FtpError> {
     client.remove_directory("new_dir")
 }
 
+#[test]
+fn binary_transfer() -> Result<(), FtpError> {
+    lock_server();
+    let mut client = Client::connect(&get_local_server_hostname(), "user", "user")?;
+    let binary_data = &[b'\n'];
+    client.ascii()?;
+    client.store("binary_file.bin", binary_data)?;
+
+    let file_data = client.retrieve_file("binary_file.bin")?;
+    assert_eq!(&file_data, binary_data);
+
+    client.ascii()?;
+    let ascii_file_data = client.retrieve_file("binary_file.bin")?;
+    assert!(&file_data != &ascii_file_data);
+
+    Ok(())
+}
+
 /// Get the hostname for the local server.
 fn get_local_server_hostname() -> String {
     std::env::var("SERVER_HOSTNAME").unwrap()
