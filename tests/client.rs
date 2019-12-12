@@ -7,6 +7,7 @@
 use ftp_client::error::Error as FtpError;
 use ftp_client::prelude::*;
 use once_cell::sync::OnceCell;
+use std::io::Read;
 use std::sync::Mutex;
 
 #[test]
@@ -213,16 +214,17 @@ fn delete_directory() -> Result<(), FtpError> {
 fn binary_transfer() -> Result<(), FtpError> {
     lock_server();
     let mut client = Client::connect(&get_local_server_hostname(), "user", "user")?;
-    let binary_data = &[b'\n'];
-    client.ascii()?;
-    client.store("binary_file.bin", binary_data)?;
 
-    let file_data = client.retrieve_file("binary_file.bin")?;
-    assert_eq!(&file_data, binary_data);
+    let file_bytes_ascii = client.retrieve_file("cat.png")?;
+    client.binary()?;
+    let file_bytes_binary = client.retrieve_file("cat.png")?;
 
-    client.ascii()?;
-    let ascii_file_data = client.retrieve_file("binary_file.bin")?;
-    assert!(&file_data != &ascii_file_data);
+    let mut reference_file = std::fs::File::open("res/cat.png").unwrap();
+    let mut reference_bytes = Vec::new();
+    reference_file.read_to_end(&mut reference_bytes).unwrap();
+
+    assert!(file_bytes_ascii != reference_bytes);
+    assert_eq!(file_bytes_binary, reference_bytes);
 
     Ok(())
 }
