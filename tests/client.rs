@@ -7,6 +7,7 @@
 use ftp_client::error::Error as FtpError;
 use ftp_client::prelude::*;
 use once_cell::sync::OnceCell;
+use std::io::Read;
 use std::sync::Mutex;
 
 #[test]
@@ -209,15 +210,34 @@ fn delete_directory() -> Result<(), FtpError> {
     client.remove_directory("new_dir")
 }
 
+#[test]
+fn binary_transfer() -> Result<(), FtpError> {
+    lock_server();
+    let mut client = Client::connect(&get_local_server_hostname(), "user", "user")?;
+
+    let file_bytes_ascii = client.retrieve_file("cat.png")?;
+    client.binary()?;
+    let file_bytes_binary = client.retrieve_file("cat.png")?;
+
+    let mut reference_file = std::fs::File::open("res/cat.png").unwrap();
+    let mut reference_bytes = Vec::new();
+    reference_file.read_to_end(&mut reference_bytes).unwrap();
+
+    assert!(file_bytes_ascii != reference_bytes);
+    assert_eq!(file_bytes_binary, reference_bytes);
+
+    Ok(())
+}
+
 /// Get the hostname for the local server.
 fn get_local_server_hostname() -> String {
-    std::env::var("SERVER_HOSTNAME").unwrap()
+    std::env::var("SERVER_HOSTNAME").expect("SERVER_HOSTNAME is not set.")
 }
 
 static SERVER_MUTEX: OnceCell<Mutex<()>> = OnceCell::new();
 /// Tests using the local server can not run concurrently.
 fn lock_server() {
     let mutex = SERVER_MUTEX.get_or_init(|| Mutex::new(()));
-    let _guard = mutex.lock().unwrap();
+    let _guard = mutex.lock().expect("Could not lock server.");
     std::thread::sleep(std::time::Duration::from_millis(500));
 }
