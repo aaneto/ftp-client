@@ -231,13 +231,13 @@ fn binary_transfer() -> Result<(), FtpError> {
 
 /// Get the hostname for the local server.
 fn get_local_server_hostname() -> String {
-    std::env::var("SERVER_HOSTNAME").unwrap()
+    std::env::var("SERVER_HOSTNAME").expect("SERVER_HOSTNAME is not set.")
 }
 
 static SERVER_MUTEX: OnceCell<Mutex<()>> = OnceCell::new();
 /// Tests using the local server can not run concurrently.
 fn lock_server() {
     let mutex = SERVER_MUTEX.get_or_init(|| Mutex::new(()));
-    let _guard = mutex.lock().unwrap();
+    let _guard = mutex.lock().expect("Could not lock server.");
     std::thread::sleep(std::time::Duration::from_millis(500));
 }
