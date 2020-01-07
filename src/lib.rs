@@ -25,6 +25,7 @@
 pub mod client;
 pub mod error;
 pub mod status_code;
+pub mod sync;
 
 /// The prelude module contains some useful default imports.
 pub mod prelude {

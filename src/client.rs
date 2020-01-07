@@ -6,11 +6,12 @@
 use crate::status_code::{StatusCode, StatusCodeKind};
 use derive_more::From;
 use log::warn;
-use native_tls::{TlsConnector, TlsStream};
-use std::io::prelude::*;
-use std::io::BufReader;
-use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::ToSocketAddrs;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::net::TcpStream;
+use tokio_tls::TlsStream;
 
 /// Represents a raw server response, with
 /// a status code and the message after it.
@@ -89,29 +90,24 @@ impl ClientStream {
             ClientStream::TlsStream(stream) => stream.get_ref().peer_addr(),
         }
     }
-}
 
-impl Read for ClientStream {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+    pub async fn write_all(&mut self, bytes: &[u8]) -> Result<(), std::io::Error> {
         match self {
-            ClientStream::TcpStream(stream) => stream.read(buf),
-            ClientStream::TlsStream(stream) => stream.read(buf),
+            Self::TcpStream(ref mut stream) => stream.write_all(bytes).await,
+            Self::TlsStream(ref mut stream) => stream.write_all(bytes).await,
         }
     }
 }
 
-impl Write for ClientStream {
-    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
-        match self {
-            ClientStream::TcpStream(stream) => stream.write(buf),
-            ClientStream::TlsStream(stream) => stream.write(buf),
-        }
-    }
-
-    fn flush(&mut self) -> Result<(), std::io::Error> {
-        match self {
-            ClientStream::TcpStream(stream) => stream.flush(),
-            ClientStream::TlsStream(stream) => stream.flush(),
+impl AsyncRead for ClientStream {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<Result<usize, std::io::Error>> {
+        match Pin::into_inner(self) {
+            ClientStream::TcpStream(stream) => Pin::new(stream).poll_read(cx, buf),
+            ClientStream::TlsStream(stream) => Pin::new(stream).poll_read(cx, buf),
         }
     }
 }
@@ -134,35 +130,37 @@ impl Client {
     }
 
     /// Connect to a new FTP server using plain text (no TLS).
-    pub fn connect(
+    pub async fn connect(
         hostname: &str,
         user: &str,
         password: &str,
     ) -> Result<Self, crate::error::Error> {
-        Self::connect_with_port(hostname, 21, user, password)
+        Self::connect_with_port(hostname, 21, user, password).await
     }
 
     /// Connect to a new FTP server using a secure connection (TLS).
-    pub fn connect_tls(
+    pub async fn connect_tls(
         hostname: &str,
         user: &str,
         password: &str,
     ) -> Result<Self, crate::error::Error> {
-        Self::connect_tls_with_port(hostname, 21, user, password)
+        Self::connect_tls_with_port(hostname, 21, user, password).await
     }
 
     /// Connect to a new FTP server using a secure connection (TLS) on a specific port.
-    pub fn connect_tls_with_port(
+    pub async fn connect_tls_with_port(
         hostname: &str,
         port: u32,
         user: &str,
         password: &str,
     ) -> Result<Self, crate::error::Error> {
-        let connector = TlsConnector::new()?;
+        let cx = native_tls::TlsConnector::new()?;
+        let connector = tokio_tls::TlsConnector::from(cx);
 
         let host = format!("{}:{}", hostname, port);
-        let raw_stream = TcpStream::connect(&host)?;
-        let tls_stream = connector.connect(&host, raw_stream)?;
+        let addr = host.to_socket_addrs()?.next().unwrap();
+        let raw_stream = TcpStream::connect(&addr).await?;
+        let tls_stream = connector.connect(&host, raw_stream).await?;
         let stream: BufReader<ClientStream> = BufReader::new(tls_stream.into());
 
         let buffer = String::new();
@@ -172,23 +170,26 @@ impl Client {
             welcome_string: None,
             mode: ClientMode::ExtendedPassive,
         };
-        let response = client.parse_reply_expecting(vec![StatusCodeKind::ReadyForNewUser])?;
+        let response = client
+            .parse_reply_expecting(vec![StatusCodeKind::ReadyForNewUser])
+            .await?;
         client.welcome_string = Some(response.message);
-        client.login(user, password)?;
+        client.login(user, password).await?;
 
         Ok(client)
     }
 
     /// Connect to a new FTP server using plain text (no TLS) on a specific port.
-    pub fn connect_with_port(
+    pub async fn connect_with_port(
         hostname: &str,
         port: u32,
         user: &str,
         password: &str,
     ) -> Result<Self, crate::error::Error> {
         let host = format!("{}:{}", hostname, port);
-        let raw_stream = TcpStream::connect(&host)?;
-        let stream = BufReader::new(raw_stream.into());
+        let addr = host.to_socket_addrs()?.next().unwrap();
+        let raw_stream = TcpStream::connect(&addr).await?;
+        let stream: BufReader<ClientStream> = BufReader::new(raw_stream.into());
 
         let buffer = String::new();
         let mut client = Client {
@@ -197,9 +198,11 @@ impl Client {
             welcome_string: None,
             mode: ClientMode::ExtendedPassive,
         };
-        let response = client.parse_reply_expecting(vec![StatusCodeKind::ReadyForNewUser])?;
+        let response = client
+            .parse_reply_expecting(vec![StatusCodeKind::ReadyForNewUser])
+            .await?;
         client.welcome_string = Some(response.message);
-        client.login(user, password)?;
+        client.login(user, password).await?;
 
         Ok(client)
     }
@@ -212,34 +215,39 @@ impl Client {
     /// Login using the given user and password.
     /// Note that many servers require a login with an anonymous user,
     /// such as client.login("anonymous", "anonymous@mail.com").
-    pub fn login(&mut self, user: &str, password: &str) -> Result<(), crate::error::Error> {
-        self.write_unary_command_expecting("USER", user, vec![StatusCodeKind::PasswordRequired])?;
-        self.write_unary_command_expecting("PASS", password, vec![StatusCodeKind::UserLoggedIn])?;
+    pub async fn login(&mut self, user: &str, password: &str) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting("USER", user, vec![StatusCodeKind::PasswordRequired])
+            .await?;
+        self.write_unary_command_expecting("PASS", password, vec![StatusCodeKind::UserLoggedIn])
+            .await?;
 
         Ok(())
     }
 
     /// Logout from the current user/password pair.
-    pub fn logout(&mut self) -> Result<(), crate::error::Error> {
-        self.write_command_expecting("QUIT", vec![StatusCodeKind::ClosingControlConnection])?;
+    pub async fn logout(&mut self) -> Result<(), crate::error::Error> {
+        self.write_command_expecting("QUIT", vec![StatusCodeKind::ClosingControlConnection])
+            .await?;
 
         Ok(())
     }
 
     /// Change the working directory on the current session.
-    pub fn cwd(&mut self, dir: &str) -> Result<(), crate::error::Error> {
+    pub async fn cwd(&mut self, dir: &str) -> Result<(), crate::error::Error> {
         self.write_unary_command_expecting(
             "CWD",
             dir,
             vec![StatusCodeKind::RequestFileActionCompleted],
-        )?;
+        )
+        .await?;
 
         Ok(())
     }
 
     /// Go up to the parent directory on the current session.
-    pub fn cdup(&mut self) -> Result<(), crate::error::Error> {
-        self.write_command_expecting("CDUP", vec![StatusCodeKind::RequestFileActionCompleted])?;
+    pub async fn cdup(&mut self) -> Result<(), crate::error::Error> {
+        self.write_command_expecting("CDUP", vec![StatusCodeKind::RequestFileActionCompleted])
+            .await?;
 
         Ok(())
     }
@@ -249,30 +257,34 @@ impl Client {
     ///
     /// The help command can also be used with an argument to see detailed
     /// information about a single command, this behaviour is not implemented.
-    pub fn help(&mut self) -> Result<(), crate::error::Error> {
+    pub async fn help(&mut self) -> Result<(), crate::error::Error> {
         self.write_command_expecting(
             "HELP",
             vec![StatusCodeKind::SystemStatus, StatusCodeKind::HelpMessage],
-        )?;
+        )
+        .await?;
         Ok(())
     }
 
     /// This command should not do anything other than receiving
     /// an OK response from the server.
-    pub fn noop(&mut self) -> Result<(), crate::error::Error> {
-        self.write_command_expecting("NOOP", vec![StatusCodeKind::Ok])?;
+    pub async fn noop(&mut self) -> Result<(), crate::error::Error> {
+        self.write_command_expecting("NOOP", vec![StatusCodeKind::Ok])
+            .await?;
         Ok(())
     }
 
     /// Set the transfer type to ascii
-    pub fn ascii(&mut self) -> Result<(), crate::error::Error> {
-        self.write_unary_command_expecting("TYPE", "A", vec![StatusCodeKind::Ok])?;
+    pub async fn ascii(&mut self) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting("TYPE", "A", vec![StatusCodeKind::Ok])
+            .await?;
         Ok(())
     }
 
     /// Set the transfer type to binary
-    pub fn binary(&mut self) -> Result<(), crate::error::Error> {
-        self.write_unary_command_expecting("TYPE", "I", vec![StatusCodeKind::Ok])?;
+    pub async fn binary(&mut self) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting("TYPE", "I", vec![StatusCodeKind::Ok])
+            .await?;
         Ok(())
     }
 
@@ -280,15 +292,17 @@ impl Client {
     /// during transfer and between them. This command can be used with
     /// and argument to get behaviour similar to LIST, this particular
     /// behaviour is not implemented.
-    pub fn status(&mut self) -> Result<String, crate::error::Error> {
-        let response = self.write_command_expecting("STAT", vec![StatusCodeKind::SystemStatus])?;
+    pub async fn status(&mut self) -> Result<String, crate::error::Error> {
+        let response = self
+            .write_command_expecting("STAT", vec![StatusCodeKind::SystemStatus])
+            .await?;
 
         Ok(response.message)
     }
 
     /// List the provided path in any way the server desires.
-    pub fn list(&mut self, path: &str) -> Result<String, crate::error::Error> {
-        let mut conn = self.get_data_connection()?;
+    pub async fn list(&mut self, path: &str) -> Result<String, crate::error::Error> {
+        let mut conn = self.get_data_connection().await?;
         self.write_unary_command_expecting(
             "LIST",
             path,
@@ -296,11 +310,13 @@ impl Client {
                 StatusCodeKind::TransferStarted,
                 StatusCodeKind::TransferAboutToStart,
             ],
-        )?;
+        )
+        .await?;
 
         let mut buffer = Vec::with_capacity(1024);
-        conn.read_to_end(&mut buffer)?;
-        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+        conn.read_to_end(&mut buffer).await?;
+        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])
+            .await?;
         let text = String::from_utf8(buffer).map_err(|_| {
             crate::error::Error::SerializationFailed(
                 "Invalid ASCII returned on server directory listing.".to_string(),
@@ -310,8 +326,8 @@ impl Client {
     }
 
     /// List the provided path, providing only name information about files and directories.
-    pub fn list_names(&mut self, path: &str) -> Result<Vec<String>, crate::error::Error> {
-        let mut conn = self.get_data_connection()?;
+    pub async fn list_names(&mut self, path: &str) -> Result<Vec<String>, crate::error::Error> {
+        let mut conn = self.get_data_connection().await?;
         self.write_unary_command_expecting(
             "NLST",
             path,
@@ -319,11 +335,13 @@ impl Client {
                 StatusCodeKind::TransferStarted,
                 StatusCodeKind::TransferAboutToStart,
             ],
-        )?;
+        )
+        .await?;
 
         let mut buffer = Vec::with_capacity(1024);
-        conn.read_to_end(&mut buffer)?;
-        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+        conn.read_to_end(&mut buffer).await?;
+        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])
+            .await?;
         let text = String::from_utf8(buffer).map_err(|_| {
             crate::error::Error::SerializationFailed(
                 "Invalid ASCII returned on server directory name listing.".to_string(),
@@ -333,14 +351,14 @@ impl Client {
     }
 
     /// Store a new file on a provided path and name.
-    pub fn store<B: AsRef<[u8]>>(
+    pub async fn store<B: AsRef<[u8]>>(
         &mut self,
         path: &str,
         data: B,
     ) -> Result<(), crate::error::Error> {
         // Scope connection so it drops before reading server reply.
         {
-            let mut conn = self.get_data_connection()?;
+            let mut conn = self.get_data_connection().await?;
             self.write_unary_command_expecting(
                 "STOR",
                 path,
@@ -348,44 +366,52 @@ impl Client {
                     StatusCodeKind::TransferStarted,
                     StatusCodeKind::TransferAboutToStart,
                 ],
-            )?;
-            conn.get_mut().write_all(data.as_ref())?;
+            )
+            .await?;
+            conn.write_all(data.as_ref()).await?;
         }
 
-        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])
+            .await?;
 
         Ok(())
     }
 
     /// Store a new file on a provided path using a random unique name.
-    pub fn store_unique<B: AsRef<[u8]>>(&mut self, data: B) -> Result<String, crate::error::Error> {
+    pub async fn store_unique<B: AsRef<[u8]>>(
+        &mut self,
+        data: B,
+    ) -> Result<String, crate::error::Error> {
         // Scope connection so it drops before reading server reply.
         {
-            let mut conn = self.get_data_connection()?;
+            let mut conn = self.get_data_connection().await?;
             self.write_command_expecting(
                 "STOU",
                 vec![
                     StatusCodeKind::TransferStarted,
                     StatusCodeKind::TransferAboutToStart,
                 ],
-            )?;
-            conn.get_mut().write_all(data.as_ref())?;
+            )
+            .await?;
+            conn.write_all(data.as_ref()).await?;
         }
 
-        let reply = self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+        let reply = self
+            .parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])
+            .await?;
 
         Ok(reply.message)
     }
 
     /// Append to a existing file or a create a new one.
-    pub fn append<B: AsRef<[u8]>>(
+    pub async fn append<B: AsRef<[u8]>>(
         &mut self,
         path: &str,
         data: B,
     ) -> Result<(), crate::error::Error> {
         // Scope connection so it drops before reading server reply.
         {
-            let mut conn = self.get_data_connection()?;
+            let mut conn = self.get_data_connection().await?;
             self.write_unary_command_expecting(
                 "APPE",
                 path,
@@ -393,14 +419,16 @@ impl Client {
                     StatusCodeKind::TransferStarted,
                     StatusCodeKind::TransferAboutToStart,
                 ],
-            )?;
-            conn.get_mut().write_all(data.as_ref())?;
+            )
+            .await?;
+            conn.write_all(data.as_ref()).await?;
         }
 
         self.parse_reply_expecting(vec![
             StatusCodeKind::RequestActionCompleted,
             StatusCodeKind::RequestFileActionCompleted,
-        ])?;
+        ])
+        .await?;
 
         Ok(())
     }
@@ -425,7 +453,7 @@ impl Client {
     }
 
     /// Move a file from a path to another, essentially renaming it.
-    pub fn rename_file(
+    pub async fn rename_file(
         &mut self,
         path_from: &str,
         path_to: &str,
@@ -434,35 +462,41 @@ impl Client {
             "RNFR",
             path_from,
             vec![StatusCodeKind::RequestActionPending],
-        )?;
+        )
+        .await?;
         self.write_unary_command_expecting(
             "RNTO",
             path_to,
             vec![StatusCodeKind::RequestFileActionCompleted],
-        )?;
+        )
+        .await?;
 
         Ok(())
     }
 
     /// Remove an existing directory.
-    pub fn remove_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+    pub async fn remove_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
         self.write_unary_command_expecting(
             "RMD",
             dir_path,
             vec![StatusCodeKind::RequestFileActionCompleted],
-        )?;
+        )
+        .await?;
         Ok(())
     }
 
     /// Make a new directory.
-    pub fn make_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
-        self.write_unary_command_expecting("MKD", dir_path, vec![StatusCodeKind::PathCreated])?;
+    pub async fn make_directory(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+        self.write_unary_command_expecting("MKD", dir_path, vec![StatusCodeKind::PathCreated])
+            .await?;
         Ok(())
     }
 
     /// Get the current working directory.
-    pub fn pwd(&mut self) -> Result<String, crate::error::Error> {
-        let response = self.write_command_expecting("PWD", vec![StatusCodeKind::PathCreated])?;
+    pub async fn pwd(&mut self) -> Result<String, crate::error::Error> {
+        let response = self
+            .write_command_expecting("PWD", vec![StatusCodeKind::PathCreated])
+            .await?;
         Ok(response.message)
     }
 
@@ -476,37 +510,41 @@ impl Client {
     /// the HELP SITE command.
     ///
     /// Extracted from RFC959.
-    pub fn site_parameters(&mut self) -> Result<String, crate::error::Error> {
-        let response = self.write_command_expecting(
-            "SITE",
-            vec![StatusCodeKind::Ok, StatusCodeKind::FeatureNotImplemented],
-        )?;
+    pub async fn site_parameters(&mut self) -> Result<String, crate::error::Error> {
+        let response = self
+            .write_command_expecting(
+                "SITE",
+                vec![StatusCodeKind::Ok, StatusCodeKind::FeatureNotImplemented],
+            )
+            .await?;
 
         Ok(response.message)
     }
 
     /// Get the type of operating system on the server.
-    pub fn system(&mut self) -> Result<String, crate::error::Error> {
-        let response =
-            self.write_command_expecting("SYST", vec![StatusCodeKind::NameSystemType])?;
+    pub async fn system(&mut self) -> Result<String, crate::error::Error> {
+        let response = self
+            .write_command_expecting("SYST", vec![StatusCodeKind::NameSystemType])
+            .await?;
 
         Ok(response.message)
     }
 
     /// Delete a file at a path.
-    pub fn delete_file(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
+    pub async fn delete_file(&mut self, dir_path: &str) -> Result<(), crate::error::Error> {
         self.write_unary_command_expecting(
             "DELE",
             dir_path,
             vec![StatusCodeKind::RequestFileActionCompleted],
-        )?;
+        )
+        .await?;
 
         Ok(())
     }
 
     /// Download a file at a path into a byte buffer.
-    pub fn retrieve_file(&mut self, path: &str) -> Result<Vec<u8>, crate::error::Error> {
-        let mut conn = self.get_data_connection()?;
+    pub async fn retrieve_file(&mut self, path: &str) -> Result<Vec<u8>, crate::error::Error> {
+        let mut conn = self.get_data_connection().await?;
         self.write_unary_command_expecting(
             "RETR",
             path,
@@ -514,86 +552,94 @@ impl Client {
                 StatusCodeKind::TransferAboutToStart,
                 StatusCodeKind::TransferStarted,
             ],
-        )?;
+        )
+        .await?;
 
         let mut buffer = Vec::with_capacity(1024);
-        conn.read_to_end(&mut buffer)?;
-        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])?;
+        conn.read_to_end(&mut buffer).await?;
+        self.parse_reply_expecting(vec![StatusCodeKind::RequestActionCompleted])
+            .await?;
         Ok(buffer)
     }
 
     /// Acquire the data connection using the current ClientMode.
-    pub fn get_data_connection(&mut self) -> Result<BufReader<TcpStream>, crate::error::Error> {
+    pub async fn get_data_connection(&mut self) -> Result<TcpStream, crate::error::Error> {
         match self.mode {
             ClientMode::Active => unimplemented!(),
-            ClientMode::Passive => self.passive_mode_connection(),
-            ClientMode::ExtendedPassive => self.extended_passive_mode_connection(),
+            ClientMode::Passive => self.passive_mode_connection().await,
+            ClientMode::ExtendedPassive => self.extended_passive_mode_connection().await,
         }
     }
 
     /// Create a extended passive mode connection.
-    pub fn extended_passive_mode_connection(
+    pub async fn extended_passive_mode_connection(
         &mut self,
-    ) -> Result<BufReader<TcpStream>, crate::error::Error> {
-        let response =
-            self.write_command_expecting("EPSV", vec![StatusCodeKind::EnteredExtendedPassiveMode])?;
+    ) -> Result<TcpStream, crate::error::Error> {
+        let response = self
+            .write_command_expecting("EPSV", vec![StatusCodeKind::EnteredExtendedPassiveMode])
+            .await?;
         let socket = self.decode_extended_passive_mode_socket(&response.message)?;
 
-        Ok(BufReader::new(TcpStream::connect(socket)?))
+        Ok(TcpStream::connect(socket).await?)
     }
 
     /// Create a passive mode connection.
-    pub fn passive_mode_connection(&mut self) -> Result<BufReader<TcpStream>, crate::error::Error> {
-        let response =
-            self.write_command_expecting("PASV", vec![StatusCodeKind::EnteredPassiveMode])?;
+    pub async fn passive_mode_connection(&mut self) -> Result<TcpStream, crate::error::Error> {
+        let response = self
+            .write_command_expecting("PASV", vec![StatusCodeKind::EnteredPassiveMode])
+            .await?;
         let socket = self.decode_passive_mode_ip(&response.message)?;
 
-        Ok(BufReader::new(TcpStream::connect(socket)?))
+        Ok(TcpStream::connect(socket).await?)
     }
 
     /// Write a command with one argument to the server expecting a list of positive status codes.
-    pub fn write_unary_command_expecting(
+    pub async fn write_unary_command_expecting(
         &mut self,
         cmd: &str,
         arg: &str,
         valid_statuses: Vec<StatusCodeKind>,
     ) -> Result<ServerResponse, crate::error::Error> {
-        self.write_unary_command(cmd, arg)?;
-        self.parse_reply_expecting(valid_statuses)
+        self.write_unary_command(cmd, arg).await?;
+        self.parse_reply_expecting(valid_statuses).await
     }
 
     /// Write a command with one argument to the server.
-    pub fn write_unary_command(&mut self, cmd: &str, arg: &str) -> Result<(), crate::error::Error> {
+    pub async fn write_unary_command(
+        &mut self,
+        cmd: &str,
+        arg: &str,
+    ) -> Result<(), crate::error::Error> {
         let text = format!("{} {}\r\n", cmd, arg);
-        self.stream.get_mut().write_all(text.as_bytes())?;
+        self.stream.get_mut().write_all(text.as_bytes()).await?;
 
         Ok(())
     }
 
     /// Write a command to the server expecting a list of positive status codes.
-    pub fn write_command_expecting(
+    pub async fn write_command_expecting(
         &mut self,
         cmd: &str,
         valid_statuses: Vec<StatusCodeKind>,
     ) -> Result<ServerResponse, crate::error::Error> {
-        self.write_command(cmd)?;
-        self.parse_reply_expecting(valid_statuses)
+        self.write_command(cmd).await?;
+        self.parse_reply_expecting(valid_statuses).await
     }
 
     /// Write a command to the server.
-    pub fn write_command(&mut self, cmd: &str) -> Result<(), crate::error::Error> {
+    pub async fn write_command(&mut self, cmd: &str) -> Result<(), crate::error::Error> {
         let text = format!("{}\r\n", cmd);
-        self.stream.get_mut().write_all(text.as_bytes())?;
+        self.stream.get_mut().write_all(text.as_bytes()).await?;
 
         Ok(())
     }
 
     /// Parse the server reply into a ServerResponse expecting a list of status codes.
-    pub fn parse_reply_expecting(
+    pub async fn parse_reply_expecting(
         &mut self,
         valid_statuses: Vec<StatusCodeKind>,
     ) -> Result<ServerResponse, crate::error::Error> {
-        let response = self.parse_reply()?;
+        let response = self.parse_reply().await?;
 
         let is_expected_status = valid_statuses.contains(&response.status_code.kind);
         // We are a bit liberal on what we accept.
@@ -613,16 +659,16 @@ impl Client {
     }
 
     /// Parse the server reply into a ServerResponse.
-    pub fn parse_reply(&mut self) -> Result<ServerResponse, crate::error::Error> {
+    pub async fn parse_reply(&mut self) -> Result<ServerResponse, crate::error::Error> {
         self.buffer.clear();
-        self.stream.read_line(&mut self.buffer)?;
+        self.stream.read_line(&mut self.buffer).await?;
         Ok(ServerResponse::parse(&self.buffer))
     }
 
     /// Read the server reply as a raw string.
-    pub fn read_reply(&mut self) -> Result<String, crate::error::Error> {
+    pub async fn read_reply(&mut self) -> Result<String, crate::error::Error> {
         self.buffer.clear();
-        self.stream.read_line(&mut self.buffer)?;
+        self.stream.read_line(&mut self.buffer).await?;
         Ok(self.buffer.clone())
     }
 
