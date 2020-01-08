@@ -7,9 +7,9 @@
 //! Listing the files on the current working directory looks like
 //! below when using this crate:
 //! ```rust
-//! use ftp_client::prelude::*;
+//! use ftp_client::{error::Error, sync::Client};
 //!
-//! fn main() -> Result<(), ftp_client::error::Error> {
+//! fn main() -> Result<(), Error> {
 //!     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
 //!     let names = client.list_names("/")?;
 //!     println!("Listing names: ");
