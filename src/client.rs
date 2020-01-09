@@ -109,7 +109,7 @@ impl Client {
         let host = format!("{}:{}", hostname, port);
         let addr = host.to_socket_addrs()?.next().unwrap();
         let raw_stream = TcpStream::connect(&addr).await?;
-        let stream = BufReader::new(raw_stream.into());
+        let stream = BufReader::new(raw_stream);
 
         let buffer = String::new();
         let mut client = Client {
