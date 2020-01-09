@@ -148,14 +148,6 @@ fn external_ipv6() -> Result<(), FtpError> {
 }
 
 #[test]
-fn external_tls() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
-    // Run random command just to assert we are communicating
-    let _system_name = client.system()?;
-    Ok(())
-}
-
-#[test]
 fn append() -> Result<(), FtpError> {
     lock_server();
     let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;

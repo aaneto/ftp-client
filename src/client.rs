@@ -4,14 +4,10 @@
 //! Most functions were implemented using the RFC959 as reference
 //! and may not work as expected with deviant server implementations.
 use crate::status_code::{StatusCode, StatusCodeKind};
-use derive_more::From;
 use log::warn;
 use std::net::ToSocketAddrs;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
-use tokio_tls::TlsStream;
 
 /// Represents a raw server response, with
 /// a status code and the message after it.
@@ -77,47 +73,12 @@ impl ServerResponse {
     }
 }
 
-#[derive(From)]
-enum ClientStream {
-    TcpStream(TcpStream),
-    TlsStream(TlsStream<TcpStream>),
-}
-
-impl ClientStream {
-    pub fn peer_addr(&self) -> Result<std::net::SocketAddr, std::io::Error> {
-        match self {
-            ClientStream::TcpStream(stream) => stream.peer_addr(),
-            ClientStream::TlsStream(stream) => stream.get_ref().peer_addr(),
-        }
-    }
-
-    pub async fn write_all(&mut self, bytes: &[u8]) -> Result<(), std::io::Error> {
-        match self {
-            Self::TcpStream(ref mut stream) => stream.write_all(bytes).await,
-            Self::TlsStream(ref mut stream) => stream.write_all(bytes).await,
-        }
-    }
-}
-
-impl AsyncRead for ClientStream {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut [u8],
-    ) -> Poll<Result<usize, std::io::Error>> {
-        match Pin::into_inner(self) {
-            ClientStream::TcpStream(stream) => Pin::new(stream).poll_read(cx, buf),
-            ClientStream::TlsStream(stream) => Pin::new(stream).poll_read(cx, buf),
-        }
-    }
-}
-
 /// The Client is where most of the functionality is, it keeps
 /// a control connection open and opens up data connections as
 /// commands are issued. This struct is a very thin wrapper over
 /// the FTP protocol.
 pub struct Client {
-    stream: BufReader<ClientStream>,
+    stream: BufReader<TcpStream>,
     buffer: String,
     welcome_string: Option<String>,
     mode: ClientMode,
@@ -138,47 +99,6 @@ impl Client {
         Self::connect_with_port(hostname, 21, user, password).await
     }
 
-    /// Connect to a new FTP server using a secure connection (TLS).
-    pub async fn connect_tls(
-        hostname: &str,
-        user: &str,
-        password: &str,
-    ) -> Result<Self, crate::error::Error> {
-        Self::connect_tls_with_port(hostname, 21, user, password).await
-    }
-
-    /// Connect to a new FTP server using a secure connection (TLS) on a specific port.
-    pub async fn connect_tls_with_port(
-        hostname: &str,
-        port: u32,
-        user: &str,
-        password: &str,
-    ) -> Result<Self, crate::error::Error> {
-        let cx = native_tls::TlsConnector::new()?;
-        let connector = tokio_tls::TlsConnector::from(cx);
-
-        let host = format!("{}:{}", hostname, port);
-        let addr = host.to_socket_addrs()?.next().unwrap();
-        let raw_stream = TcpStream::connect(&addr).await?;
-        let tls_stream = connector.connect(&host, raw_stream).await?;
-        let stream: BufReader<ClientStream> = BufReader::new(tls_stream.into());
-
-        let buffer = String::new();
-        let mut client = Client {
-            stream,
-            buffer,
-            welcome_string: None,
-            mode: ClientMode::ExtendedPassive,
-        };
-        let response = client
-            .parse_reply_expecting(vec![StatusCodeKind::ReadyForNewUser])
-            .await?;
-        client.welcome_string = Some(response.message);
-        client.login(user, password).await?;
-
-        Ok(client)
-    }
-
     /// Connect to a new FTP server using plain text (no TLS) on a specific port.
     pub async fn connect_with_port(
         hostname: &str,
@@ -189,7 +109,7 @@ impl Client {
         let host = format!("{}:{}", hostname, port);
         let addr = host.to_socket_addrs()?.next().unwrap();
         let raw_stream = TcpStream::connect(&addr).await?;
-        let stream: BufReader<ClientStream> = BufReader::new(raw_stream.into());
+        let stream = BufReader::new(raw_stream.into());
 
         let buffer = String::new();
         let mut client = Client {

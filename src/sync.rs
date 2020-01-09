@@ -31,23 +31,6 @@ impl Client {
         })
     }
 
-    /// Connect to a new FTP server using a secure connection (TLS).
-    pub fn connect_tls(
-        hostname: &str,
-        user: &str,
-        password: &str,
-    ) -> Result<Self, crate::error::Error> {
-        let mut runtime = Runtime::new().unwrap();
-        let inner_client = runtime.block_on(AsyncClient::connect_tls_with_port(
-            hostname, 21, user, password,
-        ))?;
-
-        Ok(Client {
-            inner_client,
-            runtime,
-        })
-    }
-
     /// Get the welcome message sent by the server at the connection establishment.
     pub fn get_welcome(&self) -> Option<&String> {
         self.inner_client.get_welcome()
