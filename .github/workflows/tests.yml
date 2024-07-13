@@ -17,6 +17,8 @@ jobs:
 
       - name: Test project
         run: cargo test --verbose
+        env:
+          SERVER_HOSTNAME: localhost
 
   macos-test:
     runs-on: macos-latest
