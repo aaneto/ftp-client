@@ -5,105 +5,105 @@ on: push
 jobs:
   windows-test:
     runs-on: windows-latest
-        
+
     steps:
-    - uses: actions/checkout@v1
-    - uses: hecrj/setup-rust-action@master
-      with:
-        rust-version: stable
-    
-    - name: Build project
-      run: cargo build --verbose
-    
-    - name: Test project
-      run: cargo test external --verbose
-  
+      - uses: actions/checkout@v1
+      - uses: hecrj/setup-rust-action@master
+        with:
+          rust-version: stable
+
+      - name: Build project
+        run: cargo build --verbose
+
+      - name: Test project
+        run: cargo test --verbose
+
   macos-test:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v1
-    - uses: hecrj/setup-rust-action@master
-      with:
-        rust-version: stable
-    
-    - name: Build project
-      run: cargo build --verbose
-    
-    - name: Test project
-      run: cargo test external --verbose
-  
+      - uses: actions/checkout@v1
+      - uses: hecrj/setup-rust-action@master
+        with:
+          rust-version: stable
+
+      - name: Build project
+        run: cargo build --verbose
+
+      - name: Test project
+        run: cargo test --verbose
+
   linux-test:
     runs-on: ubuntu-latest
     services:
       ftp_server:
         image: adilsinho/ftp-server
         ports:
-        - 20:20
-        - 21:21
-        - 2558:2558
-        - 2559:2559
+          - 20:20
+          - 21:21
+          - 2558:2558
+          - 2559:2559
 
     steps:
-    - uses: actions/checkout@v1
-    - uses: hecrj/setup-rust-action@master
-      with:
-        rust-version: stable
-    
-    - name: Build project
-      run: cargo build --verbose
-    
-    - name: Test project
-      run: cargo test --verbose
-      env:
-        SERVER_HOSTNAME: localhost
-  
+      - uses: actions/checkout@v1
+      - uses: hecrj/setup-rust-action@master
+        with:
+          rust-version: stable
+
+      - name: Build project
+        run: cargo build --verbose
+
+      - name: Test project
+        run: cargo test --verbose
+        env:
+          SERVER_HOSTNAME: localhost
+
   nigthly-test:
     runs-on: ubuntu-latest
     services:
       ftp:
         image: adilsinho/ftp-server
         ports:
-        - 20:20
-        - 21:21
-        - 2558:2558
-        - 2559:2559
+          - 20:20
+          - 21:21
+          - 2558:2558
+          - 2559:2559
 
     steps:
-    - uses: actions/checkout@v1
-    - uses: hecrj/setup-rust-action@master
-      with:
-        rust-version: nightly
-    
-    - name: Build project
-      run: cargo build --verbose
-    
-    - name: Test project
-      run: cargo test --verbose
-      env:
-        SERVER_HOSTNAME: localhost
-  
+      - uses: actions/checkout@v1
+      - uses: hecrj/setup-rust-action@master
+        with:
+          rust-version: nightly
+
+      - name: Build project
+        run: cargo build --verbose
+
+      - name: Test project
+        run: cargo test --verbose
+        env:
+          SERVER_HOSTNAME: localhost
+
   legacy-test:
     runs-on: ubuntu-latest
     services:
       ftp_server:
         image: adilsinho/ftp-server
         ports:
-        - 20:20
-        - 21:21
-        - 2558:2558
-        - 2559:2559
-        
+          - 20:20
+          - 21:21
+          - 2558:2558
+          - 2559:2559
+
     steps:
-    - uses: actions/checkout@v1
-    - uses: hecrj/setup-rust-action@master
-      with:
-        rust-version: 1.39.0
-  
-    - name: Build project
-      run: cargo build --verbose
-    
-    - name: Test project
-      run: cargo test --verbose
-      env:
-        SERVER_HOSTNAME: localhost
+      - uses: actions/checkout@v1
+      - uses: hecrj/setup-rust-action@master
+        with:
+          rust-version: 1.39.0
+
+      - name: Build project
+        run: cargo build --verbose
+
+      - name: Test project
+        run: cargo test --verbose
+        env:
+          SERVER_HOSTNAME: localhost
