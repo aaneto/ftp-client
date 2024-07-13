@@ -1,7 +1,7 @@
 //! Tests for the FTP client crate, all the tests
 //! are made with real sample FTP servers.
 //!
-//! Tests that start with external_ are run with
+//! Tests that start with test_ are run with
 //! external FTP servers, the others are run
 //! with a local dockerize server that you should start.
 use ftp_client::error::Error as FtpError;
@@ -11,19 +11,18 @@ use std::io::Read;
 use std::sync::Mutex;
 
 #[test]
-fn external_name_listing() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
-
+fn test_name_listing() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
     assert_eq!(
-        vec!["/pub".to_string(), "/readme.txt".to_string()],
-        client.list_names("/")?
+        vec!["example".to_string(), "sample.txt".to_string(),],
+        client.list_names("/pub/")?
     );
     Ok(())
 }
 
 #[test]
-fn external_pwd() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
+fn test_pwd() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
     client.cwd("/pub")?;
     let dir = client.pwd()?;
     assert!(dir.contains("/pub"));
@@ -32,39 +31,40 @@ fn external_pwd() -> Result<(), FtpError> {
 }
 
 #[test]
-fn external_site() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
-    client.site_parameters()?;
+fn test_site() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
+    client.site_parameters(Some("HELP".to_string()))?;
 
     Ok(())
 }
 
 #[test]
-fn external_file_retrieval() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
-    let readme_file = client.retrieve_file("/readme.txt")?;
+fn test_file_retrieval() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
+    let cat_file = client.retrieve_file("/cat.png")?;
     // Taken previously and unlikely to change
-    let file_size = 403;
+    let file_size = 29712;
 
-    assert_eq!(readme_file.len(), file_size);
+    assert_eq!(cat_file.len(), file_size);
     Ok(())
 }
 
 #[test]
-fn external_cwd() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
+fn test_cwd() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
     client.cwd("/pub/example")?;
 
     // The /pub/example dir has many files
     let names = client.list_names("")?;
+    dbg!(names.clone());
     assert!(names.len() > 3);
 
     Ok(())
 }
 
 #[test]
-fn external_cdup() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
+fn test_cdup() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
     let initial_names = client.list_names("")?;
     client.cwd("/pub/example")?;
 
@@ -79,44 +79,37 @@ fn external_cdup() -> Result<(), FtpError> {
 }
 
 #[test]
-fn external_logout() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
+fn test_logout() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
     client.logout()
 }
 
 #[test]
-fn external_noop() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
+fn test_noop() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
     client.noop()
 }
 
 #[test]
-fn external_help() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
-    client.help()
+fn test_help() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
+    client.help(Some("LIST".to_string()))
 }
 
 #[test]
-fn external_store() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect(
-        "speedtest4.tele2.net",
-        "anonymous",
-        "anonymous@anonymous.com",
-    )?;
+fn test_store() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
     let file_data = b"Some data for you";
-    let file_name = "/upload/readyou.txt";
+    let file_name = "/pub/example/readyou.txt";
 
     client.store(file_name, file_data)
 }
 
 #[test]
-fn external_store_unique() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect(
-        "speedtest4.tele2.net",
-        "anonymous",
-        "anonymous@anonymous.com",
-    )?;
-    client.cwd("/upload/")?;
+fn test_store_unique() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
+
+    client.cwd("/pub/example/")?;
     let file_data = b"Some data for you";
     client.store_unique(file_data)?;
 
@@ -124,27 +117,13 @@ fn external_store_unique() -> Result<(), FtpError> {
 }
 
 #[test]
-fn external_system() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect("test.rebex.net", "demo", "password")?;
+fn test_system() -> Result<(), FtpError> {
+    let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
     // Should be Windows_NT but we don't need to check that..
     // since we don't want to break tests if the server changes OS
     let _system_name = client.system()?;
 
     Ok(())
-}
-
-#[test]
-#[ignore]
-fn external_ipv6() -> Result<(), FtpError> {
-    let mut client = SyncClient::connect(
-        "speedtest6.tele2.net",
-        "anonymous",
-        "anonymous@anonymous.com",
-    )?;
-
-    let data = b"DATA";
-    let file_path = "/upload/readyou.txt";
-    client.store(file_path, data)
 }
 
 #[test]
@@ -163,9 +142,9 @@ fn rename_file() -> Result<(), FtpError> {
     lock_server();
     let mut client = SyncClient::connect(&get_local_server_hostname(), "user", "user")?;
     if !client.list_names("/")?.contains(&"testfile".to_string()) {
-        client.store("testfile", b"DATA")?;
+        client.store("/testfile", b"DATA")?;
     }
-    client.rename_file("testfile", "testfile.txt")?;
+    client.rename_file("/testfile", "/testfile.txt")?;
 
     Ok(())
 }

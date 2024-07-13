@@ -10,7 +10,8 @@
 //! use ftp_client::{error::Error, sync::Client};
 //!
 //! fn main() -> Result<(), Error> {
-//!     let mut client = Client::connect("test.rebex.net", "demo", "password")?;
+//!     let server_name = std::env::var("SERVER_HOSTNAME").expect("SERVER_HOSTNAME is not set.");
+//!     let mut client = Client::connect(&server_name, "user", "user")?;
 //!     let names = client.list_names("/")?;
 //!     println!("Listing names: ");
 //!     for name in names {

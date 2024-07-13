@@ -64,8 +64,8 @@ impl Client {
     ///
     /// The help command can also be used with an argument to see detailed
     /// information about a single command, this behaviour is not implemented.
-    pub fn help(&mut self) -> Result<(), crate::error::Error> {
-        self.runtime.block_on(self.inner_client.help())
+    pub fn help(&mut self, command: Option<String>) -> Result<(), crate::error::Error> {
+        self.runtime.block_on(self.inner_client.help(command))
     }
 
     /// This command should not do anything other than receiving
@@ -181,8 +181,12 @@ impl Client {
     /// the HELP SITE command.
     ///
     /// Extracted from RFC959.
-    pub fn site_parameters(&mut self) -> Result<String, crate::error::Error> {
-        self.runtime.block_on(self.inner_client.site_parameters())
+    pub fn site_parameters(
+        &mut self,
+        argument: Option<String>,
+    ) -> Result<String, crate::error::Error> {
+        self.runtime
+            .block_on(self.inner_client.site_parameters(argument))
     }
 
     /// Get the type of operating system on the server.

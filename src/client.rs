@@ -177,9 +177,14 @@ impl Client {
     ///
     /// The help command can also be used with an argument to see detailed
     /// information about a single command, this behaviour is not implemented.
-    pub async fn help(&mut self) -> Result<(), crate::error::Error> {
+    pub async fn help(&mut self, command: Option<String>) -> Result<(), crate::error::Error> {
+        let command = match command {
+            Some(command_string) => format!(" {command_string}"),
+            None => "".to_string(),
+        };
+
         self.write_command_expecting(
-            "HELP",
+            &format!("HELP{command}"),
             vec![StatusCodeKind::SystemStatus, StatusCodeKind::HelpMessage],
         )
         .await?;
@@ -430,10 +435,17 @@ impl Client {
     /// the HELP SITE command.
     ///
     /// Extracted from RFC959.
-    pub async fn site_parameters(&mut self) -> Result<String, crate::error::Error> {
+    pub async fn site_parameters(
+        &mut self,
+        argument: Option<String>,
+    ) -> Result<String, crate::error::Error> {
+        let argument = match argument {
+            Some(argument_string) => format!(" {argument_string}"),
+            None => "".to_string(),
+        };
         let response = self
             .write_command_expecting(
-                "SITE",
+                &format!("SITE{argument}"),
                 vec![StatusCodeKind::Ok, StatusCodeKind::FeatureNotImplemented],
             )
             .await?;
