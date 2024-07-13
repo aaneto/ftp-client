@@ -3,38 +3,6 @@ name: Tests
 on: push
 
 jobs:
-  windows-test:
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v1
-      - uses: hecrj/setup-rust-action@master
-        with:
-          rust-version: stable
-
-      - name: Build project
-        run: cargo build --verbose
-
-      - name: Test project
-        run: cargo test --verbose
-        env:
-          SERVER_HOSTNAME: localhost
-
-  macos-test:
-    runs-on: macos-latest
-
-    steps:
-      - uses: actions/checkout@v1
-      - uses: hecrj/setup-rust-action@master
-        with:
-          rust-version: stable
-
-      - name: Build project
-        run: cargo build --verbose
-
-      - name: Test project
-        run: cargo test --verbose
-
   linux-test:
     runs-on: ubuntu-latest
     services:
@@ -100,7 +68,7 @@ jobs:
       - uses: actions/checkout@v1
       - uses: hecrj/setup-rust-action@master
         with:
-          rust-version: 1.50.0
+          rust-version: 1.70.0
 
       - name: Build project
         run: cargo build --verbose

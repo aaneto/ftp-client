@@ -2,11 +2,11 @@
 name = "ftp-client"
 version = "0.1.2"
 authors = ["Adilson Neto <almeidneto@gmail.com>"]
-edition = "2018"
+edition = "2021"
 readme = "README.md"
 
-keywords = [ "ftp" ]
-categories = [ "network-programming" ]
+keywords = ["ftp"]
+categories = ["network-programming"]
 description = "A FTP client library"
 repository = "https://github.com/aaneto/ftp-client"
 license = "MIT"
